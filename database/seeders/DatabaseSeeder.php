@@ -17,7 +17,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             UserSeeder::class,
             EstadoVentaSeeder::class,
-            EstadoFactura::class,
+            EstadoFacturaSeeder::class,
         ]);
     }
 }

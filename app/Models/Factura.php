@@ -3,13 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Venta;
+use App\Models\FacturaEstado;
 
 class Factura extends Model
 {
-    // Clave primaria no incremental
-    protected $primaryKey = 'numero';
-    public $incrementing  = false;
-    protected $keyType    = 'string';
+    protected $primaryKey   = 'numero';
+    public    $incrementing = false;
+    protected $keyType      = 'string';
 
     protected $fillable = [
         'numero',
@@ -23,7 +24,9 @@ class Factura extends Model
     ];
 
     /**
-     * Venta asociada (una factura, una venta).
+     * La venta asociada a esta factura.
+     * 
+     * -> facturas.numero  ← ventas.CodigoCotizacion
      */
     public function venta()
     {
@@ -31,7 +34,10 @@ class Factura extends Model
     }
 
     /**
-     * Historial de estados de esta factura.
+     * Historial de estados de la factura.
+     * 
+     * -> facturas.numero       ← factura_estados.factura_numero  
+     *    estado_facturas.id     ← factura_estados.estado_id  
      */
     public function estados()
     {

@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 class Venta extends Model
 {
     protected $primaryKey = 'idComercializacion';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     protected $fillable = [
         'CodigoCotizacion',
@@ -16,36 +18,35 @@ class Venta extends Model
         'CorreoCreador',
         'ValorFinalComercializacion',
         'ValorFinalCotizacion',
-        'NumeroEstados'
+        'NumeroEstados',
+        'estado_venta_id',
     ];
 
     protected $casts = [
         'FechaInicio' => 'date',
     ];
 
-    // Relación con Factura
+    // Venta → Factura
     public function factura()
     {
-        return $this->belongsTo(Factura::class, 'CodigoCotizacion', 'CodigoCotizacion');
+        return $this->belongsTo(Factura::class, 'CodigoCotizacion', 'numero');
     }
 
-    // Relación con Cliente
+    // Venta → Cliente
     public function cliente()
     {
-        return $this->belongsTo(Cliente::class, 'ClienteId');
+        return $this->belongsTo(Cliente::class, 'ClienteId', 'id');
     }
 
-    // Relación con Usuario
+    // Venta → Usuario
     public function creador()
     {
         return $this->belongsTo(User::class, 'CorreoCreador', 'email');
     }
 
-    // Más adelante: Estados
-    public function estados()
+    // Venta → EstadoVenta (maestro)
+    public function estadoVenta()
     {
-        return $this->hasMany(EstadoVenta::class, 'venta_id', 'idComercializacion');
+        return $this->belongsTo(EstadoVenta::class, 'estado_venta_id', 'id');
     }
 }
-
-
