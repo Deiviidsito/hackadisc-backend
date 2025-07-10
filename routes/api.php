@@ -17,3 +17,7 @@ Route::post('/obtener-venta', [ImportController::class, 'obtenerVentaPorIdComerc
 // Rutas de analíticas
 Route::post('/generar-estadisticas-pago', [\App\Http\Controllers\AnaliticasController::class, 'generarEstadisticasPago']);
 Route::get('/resumen-estadisticas-pago', [\App\Http\Controllers\AnaliticasController::class, 'obtenerResumenEstadisticas']);
+Route::get('/estadisticas-por-cliente', [\App\Http\Controllers\AnaliticasController::class, 'obtenerEstadisticasPorCliente']);
+Route::get('/tendencias-temporales', [\App\Http\Controllers\AnaliticasController::class, 'obtenerTendenciasTemporales']);
+Route::get('/distribucion-pagos', [\App\Http\Controllers\AnaliticasController::class, 'obtenerDistribucionPagos']);
+Route::get('/analisis-comparativo', [\App\Http\Controllers\AnaliticasController::class, 'obtenerAnalisisComparativo']);
