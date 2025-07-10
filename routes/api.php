@@ -13,3 +13,7 @@ Route::get('admin/users', [AuthController::class, 'getAllUsers']);
 Route::post('importar-json', [ImportController::class, 'importarVentasJson']);
 Route::post('/importar-usuarios-json', [ImportController::class, 'importarUsuariosJson']);
 Route::post('/obtener-venta', [ImportController::class, 'obtenerVentaPorIdComercializacion']);
+
+// Rutas de analíticas
+Route::post('/generar-estadisticas-pago', [\App\Http\Controllers\AnaliticasController::class, 'generarEstadisticasPago']);
+Route::get('/resumen-estadisticas-pago', [\App\Http\Controllers\AnaliticasController::class, 'obtenerResumenEstadisticas']);
