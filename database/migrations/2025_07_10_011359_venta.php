@@ -29,6 +29,9 @@ return new class extends Migration
         $table->foreign('CodigoCotizacion')->references('CodigoCotizacion')->on('facturas');
         $table->foreign('ClienteId')->references('id')->on('clientes');
         $table->foreign('CorreoCreador')->references('email')->on('users');
+        $table->unsignedTinyInteger('estado_venta_id');
+        $table->foreign('estado_venta_id')->references('id')->on('estado_ventas');
+
         });
     }
 
