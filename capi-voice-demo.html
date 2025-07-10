@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="es">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Capi Voice Demo - Chat de Voz con IA</title>
+        <style>
+            body {
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                color: #333;
+            }
+
+            .container {
+                max-width: 600px;
+                margin: 0 auto;
+                background: white;
+                border-radius: 15px;
+                padding: 30px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            }
+
+            .header {
+                text-align: center;
+                margin-bottom: 30px;
+            }
+
+            .header h1 {
+                color: #4a54e1;
+                margin-bottom: 5px;
+            }
+
+            .header p {
+                color: #666;
+                margin: 0;
+            }
+
+            .controls {
+                display: flex;
+                gap: 10px;
+                margin: 20px 0;
+                align-items: center;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+
+            .btn {
+                padding: 12px 24px;
+                border: none;
+                border-radius: 25px;
+                cursor: pointer;
+                font-weight: bold;
+                transition: all 0.3s ease;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            }
+
+            .btn-primary {
+                background: linear-gradient(45deg, #007bff, #0056b3);
+                color: white;
+            }
+
+            .btn-danger {
+                background: linear-gradient(45deg, #dc3545, #a71e2a);
+                color: white;
+            }
+
+            .btn-success {
+                background: linear-gradient(45deg, #28a745, #1e7e34);
+                color: white;
+            }
+
+            .btn:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+                transform: none;
+            }
+
+            .text-controls {
+                display: flex;
+                gap: 10px;
+                margin: 20px 0;
+                align-items: center;
+            }
+
+            .text-input {
+                flex: 1;
+                padding: 12px;
+                border: 2px solid #e9ecef;
+                border-radius: 25px;
+                font-size: 16px;
+                outline: none;
+                transition: border-color 0.3s ease;
+            }
+
+            .text-input:focus {
+                border-color: #007bff;
+            }
+
+            .status {
+                margin: 20px 0;
+                padding: 15px;
+                background: #f8f9fa;
+                border-radius: 10px;
+                text-align: center;
+                font-weight: bold;
+            }
+
+            .message-box {
+                margin: 15px 0;
+                padding: 15px;
+                border-radius: 10px;
+                display: none;
+            }
+
+            .transcription {
+                background: #e2e3ea;
+                border-left: 4px solid #6c757d;
+            }
+
+            .response {
+                background: #d1ecf1;
+                border-left: 4px solid #17a2b8;
+            }
+
+            .recording-indicator {
+                display: none;
+                text-align: center;
+                margin: 20px 0;
+            }
+
+            .recording-pulse {
+                width: 20px;
+                height: 20px;
+                background: red;
+                border-radius: 50%;
+                display: inline-block;
+                animation: pulse 1s infinite;
+            }
+
+            @keyframes pulse {
+                0% {
+                    opacity: 1;
+                    transform: scale(1);
+                }
+                50% {
+                    opacity: 0.5;
+                    transform: scale(1.2);
+                }
+                100% {
+                    opacity: 1;
+                    transform: scale(1);
+                }
+            }
+
+            .features {
+                margin-top: 30px;
+                padding: 20px;
+                background: #f1f3f4;
+                border-radius: 10px;
+            }
+
+            .feature-list {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 15px;
+                margin-top: 15px;
+            }
+
+            .feature-item {
+                padding: 10px;
+                background: white;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+            .emoji {
+                font-size: 24px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🤖 Capi Voice Demo</h1>
+                <p>Chatea con la IA de INSECAP usando tu voz</p>
+            </div>
+
+            <div class="controls">
+                <button id="recordBtn" class="btn btn-primary">
+                    <span class="emoji">🎤</span>
+                    Iniciar Grabación
+                </button>
+                <button id="stopBtn" class="btn btn-danger" disabled>
+                    <span class="emoji">⏹️</span>
+                    Detener
+                </button>
+            </div>
+
+            <div class="recording-indicator" id="recordingIndicator">
+                <div class="recording-pulse"></div>
+                <p>Grabando... Habla ahora</p>
+            </div>
+
+            <div class="text-controls">
+                <input
+                    type="text"
+                    id="textInput"
+                    class="text-input"
+                    placeholder="O escribe un mensaje para que Capi lo lea en voz alta..."
+                />
+                <button id="speakBtn" class="btn btn-success">
+                    <span class="emoji">🔊</span>
+                    Hablar
+                </button>
+            </div>
+
+            <div id="status" class="status">Inicializando...</div>
+
+            <div id="transcription" class="message-box transcription">
+                <strong>📝 Tu dijiste:</strong>
+                <span id="transcriptionText"></span>
+            </div>
+
+            <div id="response" class="message-box response">
+                <strong>🤖 Capi responde:</strong>
+                <span id="responseText"></span>
+            </div>
+
+            <div class="features">
+                <h3>✨ Características</h3>
+                <div class="feature-list">
+                    <div class="feature-item">
+                        <span class="emoji">🎤</span>
+                        <span>Reconocimiento de voz en español</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="emoji">🧠</span>
+                        <span>IA conversacional con OpenAI</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="emoji">🔊</span>
+                        <span>Síntesis de voz natural</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="emoji">📊</span>
+                        <span>Acceso a datos de usuarios</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="emoji">⚡</span>
+                        <span>Respuestas en tiempo real</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="emoji">🎯</span>
+                        <span>Personalidad única de Capi</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            /**
+             * Cliente JavaScript para interactuar con Capi por voz
+             */
+            class CapiVoiceClient {
+                constructor(baseUrl = "http://localhost:8000/api/capi") {
+                    this.baseUrl = baseUrl;
+                    this.mediaRecorder = null;
+                    this.audioChunks = [];
+                    this.isRecording = false;
+                    this.currentAudio = null;
+                }
+
+                async init() {
+                    try {
+                        const stream =
+                            await navigator.mediaDevices.getUserMedia({
+                                audio: true,
+                            });
+                        console.log("🎤 Micrófono autorizado");
+                        stream.getTracks().forEach((track) => track.stop());
+                        return true;
+                    } catch (error) {
+                        console.error(
+                            "❌ Error al acceder al micrófono:",
+                            error
+                        );
+                        return false;
+                    }
+                }
+
+                async startRecording() {
+                    if (this.isRecording) return;
+
+                    try {
+                        const stream =
+                            await navigator.mediaDevices.getUserMedia({
+                                audio: true,
+                            });
+                        this.mediaRecorder = new MediaRecorder(stream);
+                        this.audioChunks = [];
+
+                        this.mediaRecorder.ondataavailable = (event) => {
+                            if (event.data.size > 0) {
+                                this.audioChunks.push(event.data);
+                            }
+                        };
+
+                        this.mediaRecorder.onstop = () => {
+                            const audioBlob = new Blob(this.audioChunks, {
+                                type: "audio/webm",
+                            });
+                            this.sendAudioToCapi(audioBlob);
+                        };
+
+                        this.mediaRecorder.start();
+                        this.isRecording = true;
+
+                        if (this.onRecordingStart) this.onRecordingStart();
+                    } catch (error) {
+                        console.error("❌ Error al iniciar grabación:", error);
+                        if (this.onError)
+                            this.onError("No se pudo acceder al micrófono");
+                    }
+                }
+
+                stopRecording() {
+                    if (!this.isRecording) return;
+
+                    this.mediaRecorder.stop();
+                    this.isRecording = false;
+                    this.mediaRecorder.stream
+                        .getTracks()
+                        .forEach((track) => track.stop());
+
+                    if (this.onRecordingStop) this.onRecordingStop();
+                }
+
+                async sendAudioToCapi(audioBlob) {
+                    const formData = new FormData();
+                    formData.append("audio", audioBlob, "voice_message.webm");
+
+                    try {
+                        if (this.onProcessingStart) this.onProcessingStart();
+
+                        const response = await fetch(
+                            `${this.baseUrl}/voice/chat`,
+                            {
+                                method: "POST",
+                                body: formData,
+                            }
+                        );
+
+                        const result = await response.json();
+
+                        if (result.success) {
+                            if (this.onResponse) this.onResponse(result);
+                            this.playAudioResponse(result.audio_response_url);
+                            return result;
+                        } else {
+                            if (this.onError) this.onError(result.message);
+                            return null;
+                        }
+                    } catch (error) {
+                        console.error(
+                            "❌ Error al comunicarse con Capi:",
+                            error
+                        );
+                        if (this.onError)
+                            this.onError("Error de conexión con el servidor");
+                        return null;
+                    }
+                }
+
+                playAudioResponse(audioUrl) {
+                    if (this.currentAudio) {
+                        this.currentAudio.pause();
+                    }
+
+                    this.currentAudio = new Audio(audioUrl);
+
+                    this.currentAudio.onplay = () => {
+                        if (this.onAudioStart) this.onAudioStart();
+                    };
+
+                    this.currentAudio.onended = () => {
+                        if (this.onAudioEnd) this.onAudioEnd();
+                    };
+
+                    this.currentAudio.onerror = () => {
+                        if (this.onError)
+                            this.onError("Error al reproducir audio");
+                    };
+
+                    this.currentAudio.play();
+                }
+
+                async textToSpeech(text) {
+                    try {
+                        const response = await fetch(
+                            `${this.baseUrl}/voice/text-to-speech`,
+                            {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({ text }),
+                            }
+                        );
+
+                        const result = await response.json();
+
+                        if (result.success) {
+                            this.playAudioResponse(result.audio_url);
+                            return result.audio_url;
+                        } else {
+                            if (this.onError) this.onError(result.message);
+                            return null;
+                        }
+                    } catch (error) {
+                        console.error("❌ Error en text-to-speech:", error);
+                        if (this.onError)
+                            this.onError("Error al generar audio");
+                        return null;
+                    }
+                }
+
+                stopAudio() {
+                    if (this.currentAudio) {
+                        this.currentAudio.pause();
+                        this.currentAudio.currentTime = 0;
+                    }
+                }
+            }
+
+            // Inicializar la aplicación
+            document.addEventListener("DOMContentLoaded", async () => {
+                const client = new CapiVoiceClient();
+
+                // Elementos de la UI
+                const recordBtn = document.getElementById("recordBtn");
+                const stopBtn = document.getElementById("stopBtn");
+                const speakBtn = document.getElementById("speakBtn");
+                const textInput = document.getElementById("textInput");
+                const status = document.getElementById("status");
+                const transcription = document.getElementById("transcription");
+                const response = document.getElementById("response");
+                const recordingIndicator =
+                    document.getElementById("recordingIndicator");
+
+                // Configurar callbacks del cliente
+                client.onRecordingStart = () => {
+                    recordBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    recordingIndicator.style.display = "block";
+                    updateStatus("🎤 Grabando... Habla ahora");
+                };
+
+                client.onRecordingStop = () => {
+                    recordBtn.disabled = false;
+                    stopBtn.disabled = true;
+                    recordingIndicator.style.display = "none";
+                    updateStatus("📤 Procesando tu mensaje...");
+                };
+
+                client.onProcessingStart = () => {
+                    updateStatus("🧠 Capi está pensando...");
+                };
+
+                client.onResponse = (result) => {
+                    showTranscription(result.transcription);
+                    showResponse(result.text_response);
+                    updateStatus("🔊 Escucha la respuesta de Capi");
+                };
+
+                client.onAudioStart = () => {
+                    updateStatus("🔊 Capi está hablando...");
+                };
+
+                client.onAudioEnd = () => {
+                    updateStatus(
+                        "✅ Conversación completada. ¡Puedes hablar de nuevo!"
+                    );
+                };
+
+                client.onError = (message) => {
+                    updateStatus(`❌ ${message}`);
+                };
+
+                // Funciones de UI
+                function updateStatus(message) {
+                    status.textContent = message;
+                }
+
+                function showTranscription(text) {
+                    document.getElementById("transcriptionText").textContent =
+                        text;
+                    transcription.style.display = "block";
+                }
+
+                function showResponse(text) {
+                    document.getElementById("responseText").textContent = text;
+                    response.style.display = "block";
+                }
+
+                // Eventos
+                recordBtn.addEventListener("click", () =>
+                    client.startRecording()
+                );
+                stopBtn.addEventListener("click", () => client.stopRecording());
+
+                speakBtn.addEventListener("click", () => {
+                    const text = textInput.value.trim();
+                    if (text) {
+                        client.textToSpeech(text);
+                        updateStatus("🔊 Capi está hablando...");
+                        textInput.value = "";
+                    }
+                });
+
+                textInput.addEventListener("keypress", (e) => {
+                    if (e.key === "Enter") {
+                        speakBtn.click();
+                    }
+                });
+
+                // Inicializar
+                const initialized = await client.init();
+                if (initialized) {
+                    updateStatus(
+                        "✅ Micrófono listo. ¡Puedes hablar con Capi!"
+                    );
+                } else {
+                    updateStatus(
+                        "❌ No se pudo acceder al micrófono. Verifica los permisos."
+                    );
+                }
+            });
+        </script>
+    </body>
+</html>
