@@ -43,4 +43,15 @@ class Factura extends Model
     {
         return $this->hasMany(EstadoFactura::class, 'factura_numero', 'numero');
     }
+
+    /**
+     * Historial de estados de la factura.
+     * 
+     * -> facturas.numero       ← historial_estado_facturas.factura_numero  
+     *    estado_facturas.id     ← historial_estado_facturas.estado_id  
+     */
+    public function historialEstados()
+    {
+        return $this->hasMany(HistorialEstadoFactura::class, 'factura_numero', 'numero');
+    }
 }

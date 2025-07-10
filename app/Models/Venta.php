@@ -49,4 +49,10 @@ class Venta extends Model
     {
         return $this->belongsTo(EstadoVenta::class, 'estado_venta_id', 'id');
     }
+
+    // Historial de estados de la venta
+    public function historialEstados()
+    {
+        return $this->hasMany(HistorialEstadoVenta::class, 'venta_id', 'idComercializacion');
+    }
 }
