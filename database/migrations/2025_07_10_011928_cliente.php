@@ -9,10 +9,18 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-    public function up(): void
+    public function up()
     {
-        //
+        Schema::create('clientes', function (Blueprint $table) {
+            $table->id();  // PK autoincremental
+            $table->unsignedBigInteger('InsecapClienteId')->unique()
+                ->comment('ID que viene del JSON como ClienteId');
+        $table->string('NombreCliente')
+                ->comment('Nombre de la empresa, no nulo');
+            $table->timestamps();
+        });
     }
+
 
     /**
      * Reverse the migrations.

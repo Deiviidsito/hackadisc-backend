@@ -35,6 +35,6 @@ class Factura extends Model
      */
     public function estados()
     {
-        return $this->hasMany(FacturaEstado::class, 'factura_numero', 'numero');
+        return $this->hasMany(EstadoFactura::class, 'factura_numero', 'numero');
     }
 }

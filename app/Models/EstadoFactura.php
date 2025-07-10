@@ -6,21 +6,41 @@ use Illuminate\Database\Eloquent\Model;
 
 class EstadoFactura extends Model
 {
-    // No incrementa automáticamente porque usamos IDs personalizados (0–n)
-    public $incrementing = false;
-    protected $keyType = 'int';
-
     protected $fillable = [
-        'id',
-        'nombre',
-        'descripcion',
+        'factura_numero',
+        'estado_id',
+        'fecha',
+        'pagado',
+        'observacion',
+        'usuario_email',
+    ];
+
+    protected $casts = [
+        'fecha' => 'date',
+        'pagado' => 'decimal:2',
     ];
 
     /**
-     * Estados históricos de facturas que usan este estado.
+     * La factura a la que pertenece este registro de estado.
      */
-    public function facturaEstados()
+    public function factura()
     {
-        return $this->hasMany(EstadoFactura::class, 'estado_id');
+        return $this->belongsTo(Factura::class, 'factura_numero', 'numero');
+    }
+
+    /**
+     * El estado (maestro) que representa este registro.
+     */
+    public function estado()
+    {
+        return $this->belongsTo(EstadoFactura::class, 'estado_id', 'id');
+    }
+
+    /**
+     * Usuario que realizó esta transición de estado.
+     */
+    public function usuario()
+    {
+        return $this->belongsTo(User::class, 'usuario_email', 'email');
     }
 }
