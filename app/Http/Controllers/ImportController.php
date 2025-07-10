@@ -19,6 +19,9 @@ class ImportController extends Controller
 {
     public function importarVentasJson(Request $request)
     {
+        // Aumentar tiempo de ejecución para datasets grandes
+        set_time_limit(300); // 5 minutos
+
         // Elimino la validación de expectsJson para permitir subida de archivos desde form-data
         $request->validate([
             'archivo' => 'required|file|mimes:json',
@@ -53,29 +56,24 @@ class ImportController extends Controller
             ], 400);
         }
 
-        DB::beginTransaction();
+        // Procesar sin transacción global para mejorar performance
         try {
             $contador = 0;
             foreach ($ventas as $ventaData) {
                 // Validación básica de campos requeridos
                 if (empty($ventaData['idComercializacion']) || empty($ventaData['ClienteId']) || empty($ventaData['NombreCliente']) || empty($ventaData['CorreoCreador'])) {
-                    Log::warning('Registro de venta incompleto', ['ventaData' => $ventaData]);
-                    continue; // Salta registros incompletos
+                    continue; // Salta registros incompletos sin log costoso
                 }
                 // 1. Cliente
                 $cliente = Cliente::firstOrCreate(
                     ['InsecapClienteId' => $ventaData['ClienteId']],
                     ['NombreCliente' => $ventaData['NombreCliente']]
                 );
-                if ($cliente->wasRecentlyCreated) {
-                    Log::info('Cliente creado', ['InsecapClienteId' => $ventaData['ClienteId']]);
-                }
 
                 // 2. Usuario
                 $usuario = User::where('email', $ventaData['CorreoCreador'])->first();
                 if (!$usuario) {
-                    Log::warning('Usuario no encontrado para venta', ['email' => $ventaData['CorreoCreador']]);
-                    continue; // Salta ventas cuyo usuario no existe
+                    continue; // Salta ventas cuyo usuario no existe, sin log costoso
                 }
 
                 // Determinar el último estado de la venta (si existe)
@@ -102,21 +100,17 @@ class ImportController extends Controller
                         'estado_venta_id' => $ultimoEstadoVenta, // Asigna el último estado
                     ]
                 );
-                if ($venta->wasRecentlyCreated) {
-                    Log::info('Venta creada', ['idComercializacion' => $ventaData['idComercializacion']]);
-                }
 
                 // 4. Historial de estados de la venta
                 if (!empty($ventaData['Estados']) && is_array($ventaData['Estados'])) {
                     foreach ($ventaData['Estados'] as $estado) {
                         if (empty($estado['EstadoComercializacion']) || empty($estado['Fecha'])) continue;
-                        $historialVenta = HistorialEstadoVenta::create([
+                        HistorialEstadoVenta::create([
                             'venta_id' => $venta->idComercializacion,
                             'estado_venta_id' => $estado['EstadoComercializacion'],
                             'fecha' => Carbon::createFromFormat('d/m/Y', $estado['Fecha']),
                             'numero_estado' => $ventaData['NumeroEstados'] ?? null,
                         ]);
-                        Log::info('HistorialEstadoVenta creado', ['venta_id' => $venta->idComercializacion, 'estado_venta_id' => $estado['EstadoComercializacion']]);
                     }
                 }
 
@@ -131,15 +125,12 @@ class ImportController extends Controller
                                 'NumeroEstadosFactura' => $facturaData['NumeroEstadosFactura'] ?? null,
                             ]
                         );
-                        if ($factura->wasRecentlyCreated) {
-                            Log::info('Factura creada', ['numero' => $facturaData['numero']]);
-                        }
 
                         // Historial de estados de la factura
                         if (!empty($facturaData['EstadosFactura']) && is_array($facturaData['EstadosFactura'])) {
                             foreach ($facturaData['EstadosFactura'] as $estadoFactura) {
                                 if (empty($estadoFactura['estado']) || empty($estadoFactura['Fecha'])) continue;
-                                $historialFactura = HistorialEstadoFactura::create([
+                                HistorialEstadoFactura::create([
                                     'factura_numero' => $factura->numero,
                                     'estado_id' => $estadoFactura['estado'],
                                     'fecha' => Carbon::createFromFormat('d/m/Y', $estadoFactura['Fecha']),
@@ -147,14 +138,12 @@ class ImportController extends Controller
                                     'observacion' => $estadoFactura['Observacion'] ?? null,
                                     'usuario_email' => $estadoFactura['Usuario'] ?? null,
                                 ]);
-                                Log::info('HistorialEstadoFactura creado', ['factura_numero' => $factura->numero, 'estado_id' => $estadoFactura['estado']]);
                             }
                         }
                     }
                 }
                 $contador++;
             }
-            DB::commit();
             return response()->json([
                 'success' => true,
                 'message' => 'Subida de archivo exitosa, datos actualizados.',
@@ -162,7 +151,6 @@ class ImportController extends Controller
                 'registros_importados' => $contador
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
             Log::error('Error al procesar importación', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json([
                 'success' => false,
@@ -223,9 +211,10 @@ class ImportController extends Controller
         $correos = $correos->unique();
         $creados = 0;
         foreach ($correos as $correo) {
+            $nombre = explode('@', $correo)[0];
             $usuario = \App\Models\User::firstOrCreate(
                 ['email' => $correo],
-                ['name' => $correo]
+                ['name' => $nombre]
             );
             if ($usuario->wasRecentlyCreated) {
                 $creados++;
