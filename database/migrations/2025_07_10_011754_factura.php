@@ -9,10 +9,16 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-    public function up(): void
+    public function up()
     {
-        //
+            Schema::create('facturas', function (Blueprint $table) {
+                $table->string('numero')->primary(); // EJ: "28459"
+                $table->date('FechaFacturacion'); // Formato YYYY-MM-DD
+                $table->unsignedInteger('NumeroEstadosFactura')->default(0);
+                $table->timestamps();
+        });
     }
+
 
     /**
      * Reverse the migrations.
