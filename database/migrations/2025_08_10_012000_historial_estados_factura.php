@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::create('historial_estados_factura', function (Blueprint $table) {
             $table->id();
             $table->string('factura_numero'); // FK a facturas.numero
+            $table->unsignedBigInteger('idComercializacion'); // ID de comercialización del JSON
             $table->unsignedTinyInteger('estado_id'); // FK a estado_facturas.id
             $table->date('fecha');
             $table->decimal('pagado', 15, 2)->nullable();
@@ -21,6 +22,7 @@ return new class extends Migration
             $table->foreign('factura_numero')->references('numero')->on('facturas')->cascadeOnDelete();
             $table->foreign('estado_id')->references('id')->on('estado_facturas')->cascadeOnDelete();
             $table->foreign('usuario_email')->references('email')->on('users')->nullOnDelete();
+            $table->index('idComercializacion'); // Índice para búsquedas rápidas
         });
     }
 

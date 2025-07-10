@@ -106,7 +106,8 @@ class ImportController extends Controller
                     foreach ($ventaData['Estados'] as $estado) {
                         if (empty($estado['EstadoComercializacion']) || empty($estado['Fecha'])) continue;
                         HistorialEstadoVenta::create([
-                            'venta_id' => $venta->idComercializacion,
+                            'venta_id' => $venta->idVenta, // Usar la clave primaria autoincremental
+                            'idComercializacion' => $ventaData['idComercializacion'], // ID del JSON
                             'estado_venta_id' => $estado['EstadoComercializacion'],
                             'fecha' => Carbon::createFromFormat('d/m/Y', $estado['Fecha']),
                             'numero_estado' => $ventaData['NumeroEstados'] ?? null,
@@ -132,6 +133,7 @@ class ImportController extends Controller
                                 if (empty($estadoFactura['estado']) || empty($estadoFactura['Fecha'])) continue;
                                 HistorialEstadoFactura::create([
                                     'factura_numero' => $factura->numero,
+                                    'idComercializacion' => $ventaData['idComercializacion'], // ID del JSON
                                     'estado_id' => $estadoFactura['estado'],
                                     'fecha' => Carbon::createFromFormat('d/m/Y', $estadoFactura['Fecha']),
                                     'pagado' => $estadoFactura['Pagado'] ?? null,

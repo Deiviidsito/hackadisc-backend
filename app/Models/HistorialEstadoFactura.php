@@ -9,6 +9,7 @@ class HistorialEstadoFactura extends Model
     protected $table = 'historial_estados_factura';
     protected $fillable = [
         'factura_numero',
+        'idComercializacion',
         'estado_id',
         'fecha',
         'pagado',

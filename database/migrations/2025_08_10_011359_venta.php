@@ -12,7 +12,8 @@ return new class extends Migration
         public function up()
   {
     Schema::create('ventas', function (Blueprint $table) {
-        $table->bigIncrements('idComercializacion');
+        $table->bigIncrements('idVenta'); // ID autoincremental interno
+        $table->unsignedBigInteger('idComercializacion')->unique(); // ID del JSON, único pero no autoincremental
         $table->string('CodigoCotizacion');
         $table->date('FechaInicio');
         $table->unsignedBigInteger('ClienteId');

@@ -6,11 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class Venta extends Model
 {
-    protected $primaryKey = 'idComercializacion';
+    protected $primaryKey = 'idVenta';
     public $incrementing = true;
     protected $keyType = 'int';
 
     protected $fillable = [
+        'idComercializacion',
         'CodigoCotizacion',
         'FechaInicio',
         'ClienteId',
