@@ -24,10 +24,8 @@ return new class extends Migration
         $table->unsignedTinyInteger('estado_venta_id');
         $table->timestamps();
 
-        // FKs desde otros campos para el JSON
-        $table->foreign('CodigoCotizacion')
-              ->references('numero')->on('facturas')
-              ->cascadeOnUpdate()->cascadeOnDelete();
+        // Relaciones correctas
+        // Elimina la FK de CodigoCotizacion a facturas.numero
         $table->foreign('ClienteId')
               ->references('id')->on('clientes')
               ->cascadeOnUpdate()->cascadeOnDelete();
@@ -46,7 +44,6 @@ return new class extends Migration
         if (Schema::hasTable('ventas')) {
             Schema::table('ventas', function (Blueprint $table) {
                 // Suelta las FKs solo si existen
-                try { $table->dropForeign(['CodigoCotizacion']); } catch (\Exception $e) {}
                 try { $table->dropForeign(['ClienteId']); } catch (\Exception $e) {}
                 try { $table->dropForeign(['CorreoCreador']); } catch (\Exception $e) {}
                 try { $table->dropForeign(['estado_venta_id']); } catch (\Exception $e) {}
