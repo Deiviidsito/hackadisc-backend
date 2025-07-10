@@ -230,4 +230,94 @@ class ImportController extends Controller
             'usuarios_totales' => $correos->count(),
         ]);
     }
+
+    public function obtenerVentaPorIdComercializacion(Request $request)
+    {
+        $request->validate([
+            'idComercializacion' => 'required|integer',
+        ]);
+
+        $idComercializacion = $request->input('idComercializacion');
+
+        // Buscar la venta por idComercializacion
+        $venta = Venta::where('idComercializacion', $idComercializacion)->first();
+        
+        if (!$venta) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontró ninguna venta con el ID de comercialización: ' . $idComercializacion,
+            ], 404);
+        }
+
+        // Obtener el cliente
+        $cliente = Cliente::find($venta->ClienteId);
+
+        // Obtener los estados del historial de ventas
+        $estadosVenta = HistorialEstadoVenta::where('idComercializacion', $idComercializacion)
+            ->orderBy('fecha')
+            ->get();
+
+        // Obtener las facturas relacionadas con esta venta
+        $facturas = Factura::whereIn('numero', function($query) use ($idComercializacion) {
+            $query->select('factura_numero')
+                  ->from('historial_estados_factura')
+                  ->where('idComercializacion', $idComercializacion)
+                  ->distinct();
+        })->get();
+
+        // Construir el array de respuesta en el formato original del JSON
+        $ventaResponse = [
+            'idComercializacion' => $venta->idComercializacion,
+            'CodigoCotizacion' => $venta->CodigoCotizacion,
+            'FechaInicio' => $venta->FechaInicio ? (is_string($venta->FechaInicio) ? $venta->FechaInicio : $venta->FechaInicio->format('d/m/Y')) : null,
+            'ClienteId' => $cliente ? $cliente->InsecapClienteId : $venta->ClienteId,
+            'NombreCliente' => $venta->NombreCliente,
+            'CorreoCreador' => $venta->CorreoCreador,
+            'ValorFinalComercializacion' => $venta->ValorFinalComercializacion,
+            'ValorFinalCotizacion' => $venta->ValorFinalCotizacion,
+            'NumeroEstados' => $venta->NumeroEstados,
+            'Estados' => [],
+            'Facturas' => []
+        ];
+
+        // Agregar los estados de la venta
+        foreach ($estadosVenta as $estado) {
+            $ventaResponse['Estados'][] = [
+                'EstadoComercializacion' => $estado->estado_venta_id,
+                'Fecha' => is_string($estado->fecha) ? $estado->fecha : $estado->fecha->format('d/m/Y')
+            ];
+        }
+
+        // Agregar las facturas y sus estados
+        foreach ($facturas as $factura) {
+            $estadosFactura = HistorialEstadoFactura::where('factura_numero', $factura->numero)
+                ->where('idComercializacion', $idComercializacion)
+                ->orderBy('fecha')
+                ->get();
+
+            $facturaData = [
+                'numero' => $factura->numero,
+                'FechaFacturacion' => is_string($factura->FechaFacturacion) ? $factura->FechaFacturacion : $factura->FechaFacturacion->format('d/m/Y'),
+                'NumeroEstadosFactura' => $factura->NumeroEstadosFactura,
+                'EstadosFactura' => []
+            ];
+
+            foreach ($estadosFactura as $estadoFactura) {
+                $facturaData['EstadosFactura'][] = [
+                    'estado' => $estadoFactura->estado_id,
+                    'Fecha' => is_string($estadoFactura->fecha) ? $estadoFactura->fecha : $estadoFactura->fecha->format('d/m/Y'),
+                    'Pagado' => $estadoFactura->pagado,
+                    'Observacion' => $estadoFactura->observacion,
+                    'Usuario' => $estadoFactura->usuario_email
+                ];
+            }
+
+            $ventaResponse['Facturas'][] = $facturaData;
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [$ventaResponse] // Array con un elemento para mantener el formato original
+        ]);
+    }
 }
