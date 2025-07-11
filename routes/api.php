@@ -35,14 +35,16 @@ Route::get('admin/users', [AuthController::class, 'getAllUsers']);
 
 // ==================== RUTAS DE IMPORTACIÓN ====================
 
-// POST /api/importar-json - Importar ventas, facturas e historiales desde JSON
-// Body: {"data": [...]} (array con datos de ventas)
-// Response: {"success": true, "message": "Datos importados correctamente", "ventas_creadas": 150}
+// POST /api/importar-json - Importar ventas, facturas e historiales desde múltiples archivos JSON
+// Body: form-data con campo "archivos[]" (máximo 5 archivos de 20MB cada uno, total ~100MB)
+// Response: {"success": true, "message": "Importación masiva exitosa", "archivos_procesados": 3, "registros_importados": 450}
+// OPTIMIZADO: Procesamiento en lotes, bulk inserts, precarga de datos
 Route::post('importar-json', [ImportController::class, 'importarVentasJson']);
 
-// POST /api/importar-usuarios-json - Importar usuarios desde JSON
-// Body: {"users": [...]} (array con datos de usuarios)
-// Response: {"success": true, "message": "Usuarios importados", "usuarios_creados": 25}
+// POST /api/importar-usuarios-json - Importar usuarios desde múltiples archivos JSON
+// Body: form-data con campo "archivos[]" (máximo 5 archivos de 20MB cada uno)
+// Response: {"success": true, "message": "Usuarios procesados", "archivos_procesados": 2, "usuarios_creados": 125}
+// OPTIMIZADO: Bulk inserts, eliminación de duplicados, validación de emails
 Route::post('/importar-usuarios-json', [ImportController::class, 'importarUsuariosJson']);
 
 // POST /api/obtener-venta - Obtener venta por ID de comercialización
