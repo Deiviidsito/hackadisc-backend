@@ -90,6 +90,12 @@ Route::get('/distribucion-pagos', [\App\Http\Controllers\AnaliticasController::c
 
 Route::get('/analisis-comparativo', [\App\Http\Controllers\AnaliticasController::class, 'obtenerAnalisisComparativo']);
 
+// GET /api/linea-tiempo-comercializacion - Línea de tiempo de estados de facturas por cliente
+// Query params: ?cliente=NombreCliente&fecha_inicio=2024-01-01&fecha_fin=2024-12-31&agrupar_por=mes
+// Response: {"success": true, "data": {"cliente_nombre": "...", "periodos": [...], "resumen": {...}}}
+// Incluye: progresión temporal de estados, métricas de tiempo, valor por período
+Route::get('/linea-tiempo-comercializacion', [\App\Http\Controllers\AnaliticasController::class, 'obtenerLineaTiempoComercializacion']);
+
 // ==================== RUTAS DE DASHBOARD POR CLIENTE ====================
 
 // GET /api/clientes-dashboard - Lista de todos los clientes con estadísticas básicas

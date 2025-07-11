@@ -163,6 +163,102 @@ GET /api/cliente-dashboard/Syncore%20Montajes%20Industriales
 }
 ```
 
+### 4. Línea de Tiempo de Comercialización
+
+```http
+GET /api/linea-tiempo-comercializacion
+```
+
+**Parámetros de consulta:**
+
+-   `cliente` (requerido): Nombre del cliente (URL encoded)
+-   `fecha_inicio` (opcional): Fecha de inicio del filtro (YYYY-MM-DD)
+-   `fecha_fin` (opcional): Fecha de fin del filtro (YYYY-MM-DD)
+-   `agrupar_por` (opcional): Tipo de agrupación temporal ('mes', 'trimestre', 'año'). Default: 'mes'
+
+**Ejemplo:**
+
+```http
+GET /api/linea-tiempo-comercializacion?cliente=Syncore%20Montajes%20Industriales&agrupar_por=mes&fecha_inicio=2024-01-01&fecha_fin=2024-12-31
+```
+
+**Response (200):**
+
+```json
+{
+    "success": true,
+    "data": {
+        "cliente_nombre": "Syncore Montajes Industriales",
+        "agrupar_por": "mes",
+        "periodos": [
+            {
+                "periodo": "2024-12",
+                "facturas_emitidas": 2,
+                "facturas_en_proceso": 0,
+                "facturas_pagadas": 0,
+                "facturas_vencidas": 0,
+                "facturas_anuladas": 0,
+                "valor_total_emitidas": 0,
+                "valor_total_pagadas": 0,
+                "dias_promedio_para_pago": 0,
+                "porcentaje_pagadas": 0.0
+            },
+            {
+                "periodo": "2025-01",
+                "facturas_emitidas": 19,
+                "facturas_en_proceso": 0,
+                "facturas_pagadas": 21,
+                "facturas_vencidas": 0,
+                "facturas_anuladas": 0,
+                "valor_total_emitidas": 0,
+                "valor_total_pagadas": 86188200,
+                "dias_promedio_para_pago": 8.5,
+                "porcentaje_pagadas": 110.5
+            }
+        ],
+        "resumen": {
+            "total_facturas_analizadas": 16,
+            "facturas_pagadas": 13,
+            "facturas_vencidas": 0,
+            "facturas_pendientes": 3,
+            "porcentaje_pagadas": 81.3,
+            "valor_total_facturas": 20093800,
+            "valor_total_pagado": 20093800,
+            "porcentaje_valor_pagado": 100.0,
+            "tiempo_promedio_para_pago_dias": 34.8,
+            "tiempo_minimo_para_pago_dias": 7,
+            "tiempo_maximo_para_pago_dias": 47
+        }
+    }
+}
+```
+
+**Descripción de campos:**
+
+-   **periodos**: Array de períodos temporales con métricas agregadas
+
+    -   `periodo`: Identificador del período (ej: "2024-12", "2025-Q1", "2025")
+    -   `facturas_emitidas`: Número de facturas emitidas en el período
+    -   `facturas_pagadas`: Número de facturas pagadas en el período
+    -   `valor_total_pagadas`: Valor total de facturas pagadas
+    -   `dias_promedio_para_pago`: Días promedio para pago de facturas
+    -   `porcentaje_pagadas`: Porcentaje de facturas pagadas vs emitidas
+
+-   **resumen**: Estadísticas generales del cliente
+    -   `total_facturas_analizadas`: Total de facturas procesadas
+    -   `tiempo_promedio_para_pago_dias`: Tiempo promedio global de pago
+    -   `valor_total_pagado`: Valor total cobrado
+
+**Estados de facturas:**
+
+-   1: Emitida (azul #3B82F6)
+-   2: En Proceso (amarillo #F59E0B)
+-   3: Pagada (verde #10B981)
+-   4: Vencida (rojo #EF4444)
+-   5: Anulada (gris #6B7280)
+
+**Nota importante:** Solo incluye facturas de ventas con estado "Terminado" (estado_venta_id = 1 o 3) para asegurar información financiera confiable.
+
 ## Estados de Actividad del Cliente
 
 -   **Activo**: Última venta hace ≤ 30 días
@@ -266,3 +362,50 @@ GET /api/cliente-dashboard/Syncore%20Montajes%20Industriales
 -   Manejo eficiente de memoria y tiempo
 
 Los endpoints están listos para uso en producción y son compatibles con dashboards empresariales modernos.
+
+## Casos de Uso Específicos
+
+### 📈 Dashboard de Línea de Tiempo
+
+El endpoint `/api/linea-tiempo-comercializacion` es ideal para:
+
+1. **Visualización de progreso temporal**: Crear gráficos de línea mostrando la evolución de estados de facturas
+2. **Análisis de eficiencia de cobranza**: Identificar períodos con mejor/peor rendimiento de pago
+3. **Comparación entre períodos**: Analizar tendencias mes a mes o trimestre a trimestre
+4. **Predicción de cash flow**: Basado en patrones históricos de pago
+
+### 🎨 Implementación en Frontend
+
+```javascript
+// Ejemplo de uso básico
+const lineaTiempo = await fetch(
+    `/api/linea-tiempo-comercializacion?cliente=${encodeURIComponent(
+        nombreCliente
+    )}&agrupar_por=mes`
+).then((response) => response.json());
+
+// Para gráfico de Chart.js o similar
+const datasetFacturasEmitidas = {
+    label: "Facturas Emitidas",
+    data: lineaTiempo.data.periodos.map((p) => p.facturas_emitidas),
+    borderColor: "#3B82F6",
+    backgroundColor: "rgba(59, 130, 246, 0.1)",
+};
+
+const datasetFacturasPagadas = {
+    label: "Facturas Pagadas",
+    data: lineaTiempo.data.periodos.map((p) => p.facturas_pagadas),
+    borderColor: "#10B981",
+    backgroundColor: "rgba(16, 185, 129, 0.1)",
+};
+
+const labels = lineaTiempo.data.periodos.map((p) => p.periodo);
+```
+
+### 💡 Tips para el Frontend
+
+-   **Colores consistentes**: Usa los colores específicos de cada estado para mantener coherencia visual
+-   **Filtros interactivos**: Permite cambiar entre mes/trimestre/año dinámicamente
+-   **Tooltips informativos**: Muestra detalles del período al hacer hover
+-   **Responsive**: Adapta la visualización para móviles y tablets
+-   **Loading states**: Muestra spinners durante la carga (puede tardar 3-5 segundos)

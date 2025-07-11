@@ -1097,33 +1097,59 @@ class AnaliticasController extends Controller
         $ingresosTotalFacturas = 0;
         $ingresosPagados = 0;
         
-        // Obtener todos los códigos de cotización de las ventas
-        $codigosCotizacion = $ventas->pluck('CodigoCotizacion')->unique();
+        // Intentar dos métodos para encontrar facturas:
+        // 1. Por CodigoCotizacion (método tradicional)
+        $codigosCotizacion = $ventas->pluck('CodigoCotizacion')->unique()->filter();
+        $facturasPorCodigo = Factura::whereIn('numero', $codigosCotizacion)->get();
         
-        // Optimizar la consulta: obtener todas las facturas de una vez
-        $facturas = Factura::whereIn('numero', $codigosCotizacion)->get();
-        $totalFacturas = $facturas->count();
+        // 2. Por idComercializacion (método alternativo)
+        $idsComercializacion = $ventas->pluck('idComercializacion')->unique()->filter();
+        $historialesPorId = HistorialEstadoFactura::whereIn('idComercializacion', $idsComercializacion)->get();
+        $numeroFacturasPorId = $historialesPorId->pluck('factura_numero')->unique();
+        $facturasPorId = Factura::whereIn('numero', $numeroFacturasPorId)->get();
+        
+        // Combinar ambos resultados y eliminar duplicados
+        $todasLasFacturas = $facturasPorCodigo->merge($facturasPorId)->unique('numero');
+        $totalFacturas = $todasLasFacturas->count();
+        
+        if ($totalFacturas == 0) {
+            // No hay facturas, devolver estadísticas vacías
+            return [
+                'total_facturas' => 0,
+                'facturas_pagadas' => 0,
+                'facturas_pendientes' => 0,
+                'facturas_vencidas' => 0,
+                'facturas_con_historial' => 0,
+                'porcentaje_pagadas' => 0,
+                'ingresos_total_facturas' => 0,
+                'ingresos_pagados' => 0,
+                'porcentaje_ingresos_pagados' => 0,
+                'valor_promedio_factura' => 0,
+                'metodo_busqueda' => 'Sin facturas encontradas',
+                'debug_info' => [
+                    'codigos_cotizacion_count' => $codigosCotizacion->count(),
+                    'ids_comercializacion_count' => $idsComercializacion->count(),
+                    'facturas_por_codigo' => $facturasPorCodigo->count(),
+                    'facturas_por_id' => $facturasPorId->count()
+                ]
+            ];
+        }
         
         // Calcular suma total de facturas
-        $ingresosTotalFacturas = $facturas->sum('valor');
+        $ingresosTotalFacturas = $todasLasFacturas->sum('valor');
         
-        // Obtener todos los historiales de una vez para optimizar
-        $numeroFacturas = $facturas->pluck('numero');
-        $historialesPagados = HistorialEstadoFactura::whereIn('factura_numero', $numeroFacturas)
-            ->where('estado_id', 3) // Estado Pagada
-            ->pluck('factura_numero')
-            ->unique();
+        // Obtener todos los historiales para las facturas encontradas
+        $numeroFacturas = $todasLasFacturas->pluck('numero');
+        $todosLosHistoriales = HistorialEstadoFactura::whereIn('factura_numero', $numeroFacturas)->get();
         
-        $historialesVencidos = HistorialEstadoFactura::whereIn('factura_numero', $numeroFacturas)
-            ->where('estado_id', 4) // Estado Vencida (si existe)
-            ->pluck('factura_numero')
-            ->unique();
+        // Análisis de estados
+        $historialesPagados = $todosLosHistoriales->where('estado_id', 3)->pluck('factura_numero')->unique();
+        $historialesVencidos = $todosLosHistoriales->where('estado_id', 4)->pluck('factura_numero')->unique();
+        $facturasConHistorial = $todosLosHistoriales->pluck('factura_numero')->unique()->count();
         
-        $facturasConHistorial = HistorialEstadoFactura::whereIn('factura_numero', $numeroFacturas)
-            ->distinct('factura_numero')
-            ->count();
         
-        foreach ($facturas as $factura) {
+        // Procesar cada factura para calcular estadísticas
+        foreach ($todasLasFacturas as $factura) {
             // Verificar si la factura está pagada
             if ($historialesPagados->contains($factura->numero)) {
                 $facturasPagadas++;
@@ -1139,6 +1165,18 @@ class AnaliticasController extends Controller
         $porcentajePagadas = $totalFacturas > 0 ? round(($facturasPagadas / $totalFacturas) * 100, 2) : 0;
         $porcentajeIngresosPagados = $ingresosTotalFacturas > 0 ? round(($ingresosPagados / $ingresosTotalFacturas) * 100, 2) : 0;
         
+        // Determinar qué método de búsqueda fue más efectivo
+        $metodoBusqueda = '';
+        if ($facturasPorCodigo->count() > 0 && $facturasPorId->count() > 0) {
+            $metodoBusqueda = 'Ambos métodos (código + ID)';
+        } elseif ($facturasPorCodigo->count() > 0) {
+            $metodoBusqueda = 'Por código de cotización';
+        } elseif ($facturasPorId->count() > 0) {
+            $metodoBusqueda = 'Por ID de comercialización';
+        } else {
+            $metodoBusqueda = 'Ningún método efectivo';
+        }
+        
         return [
             'total_facturas' => $totalFacturas,
             'facturas_pagadas' => $facturasPagadas,
@@ -1149,7 +1187,14 @@ class AnaliticasController extends Controller
             'ingresos_total_facturas' => $ingresosTotalFacturas,
             'ingresos_pagados' => $ingresosPagados,
             'porcentaje_ingresos_pagados' => $porcentajeIngresosPagados,
-            'valor_promedio_factura' => $totalFacturas > 0 ? round($ingresosTotalFacturas / $totalFacturas, 2) : 0
+            'valor_promedio_factura' => $totalFacturas > 0 ? round($ingresosTotalFacturas / $totalFacturas, 2) : 0,
+            'metodo_busqueda' => $metodoBusqueda,
+            'debug_info' => [
+                'facturas_por_codigo' => $facturasPorCodigo->count(),
+                'facturas_por_id' => $facturasPorId->count(),
+                'total_combinado' => $totalFacturas,
+                'historiales_encontrados' => $todosLosHistoriales->count()
+            ]
         ];
     }
     
@@ -1250,12 +1295,412 @@ class AnaliticasController extends Controller
     {
         $diasSinActividad = Carbon::parse($ultimaComercializacion)->diffInDays(Carbon::now());
         
+        // Activo: menos de 30 días sin actividad
         if ($diasSinActividad <= 30) {
             return 'Activo';
-        } elseif ($diasSinActividad <= 90) {
+        } 
+        // Poco Activo: entre 31 y 90 días sin actividad
+        elseif ($diasSinActividad <= 90) {
             return 'Poco Activo';
-        } else {
+        } 
+        // Inactivo: más de 90 días sin actividad
+        else {
             return 'Inactivo';
         }
+    }
+    
+    /**
+     * Obtener línea de tiempo de comercialización por cliente
+     */
+    public function obtenerLineaTiempoComercializacion(Request $request)
+    {
+        try {
+            set_time_limit(180);
+            ini_set('memory_limit', '512M');
+            
+            $nombreCliente = $request->get('cliente');
+            $fechaInicio = $request->get('fecha_inicio');
+            $fechaFin = $request->get('fecha_fin');
+            $agruparPor = $request->get('agrupar_por', 'mes'); // mes, trimestre, año
+            
+            // Validar parámetros requeridos
+            if (!$nombreCliente) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'El parámetro cliente es requerido'
+                ], 400);
+            }
+            
+            // Decodificar nombre del cliente
+            $nombreCliente = urldecode($nombreCliente);
+            
+            // Obtener ventas del cliente que estén terminadas (estado 1 o 3)
+            $ventasQuery = Venta::where('NombreCliente', $nombreCliente)
+                ->whereIn('estado_venta_id', [1, 3]); // Solo ventas terminadas
+            
+            // Aplicar filtros de fecha si se proporcionan
+            if ($fechaInicio) {
+                $ventasQuery->where('FechaInicio', '>=', $fechaInicio);
+            }
+            if ($fechaFin) {
+                $ventasQuery->where('FechaInicio', '<=', $fechaFin);
+            }
+            
+            $ventas = $ventasQuery->get();
+            
+            if ($ventas->isEmpty()) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'cliente_nombre' => $nombreCliente,
+                        'periodos' => [],
+                        'resumen' => [
+                            'total_facturas_analizadas' => 0,
+                            'mensaje' => 'No se encontraron ventas terminadas para este cliente en el período especificado'
+                        ]
+                    ]
+                ]);
+            }
+            
+            // Obtener idComercializacion de las ventas
+            $idsComercializacion = $ventas->pluck('idComercializacion')->unique();
+            
+            // Obtener historiales de facturas relacionados con las ventas
+            $historiales = HistorialEstadoFactura::whereIn('idComercializacion', $idsComercializacion)
+                ->orderBy('fecha')
+                ->get();
+            
+            if ($historiales->isEmpty()) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'cliente_nombre' => $nombreCliente,
+                        'periodos' => [],
+                        'resumen' => [
+                            'total_facturas_analizadas' => 0,
+                            'mensaje' => 'No se encontraron historiales de facturas para las ventas terminadas de este cliente'
+                        ]
+                    ]
+                ]);
+            }
+            
+            // Agrupar historiales por número de factura
+            $historialesAgrupados = $historiales->groupBy('factura_numero');
+            
+            // Procesar línea de tiempo por factura
+            $datosLineaTiempo = [];
+            
+            foreach ($historialesAgrupados as $numeroFactura => $historialFactura) {
+                $lineaTiempoFactura = $this->procesarLineaTiempoFactura($numeroFactura, $historialFactura, $agruparPor);
+                
+                if ($lineaTiempoFactura) {
+                    $datosLineaTiempo[] = $lineaTiempoFactura;
+                }
+            }
+            
+            // Agrupar y consolidar datos por período
+            $periodos = $this->consolidarLineaTiempoPorPeriodo($datosLineaTiempo, $agruparPor);
+            
+            // Calcular resumen estadístico
+            $resumen = $this->calcularResumenLineaTiempo($datosLineaTiempo);
+            
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'cliente_nombre' => $nombreCliente,
+                    'agrupar_por' => $agruparPor,
+                    'periodos' => $periodos,
+                    'resumen' => $resumen
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Error en línea de tiempo comercialización: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => 'Error al generar línea de tiempo de comercialización'
+            ], 500);
+        }
+    }
+    
+    /**
+     * Procesar línea de tiempo para una factura específica
+     */
+    private function procesarLineaTiempoFactura($numeroFactura, $historiales, $agruparPor)
+    {
+        $estados = [
+            1 => ['nombre' => 'Emitida', 'color' => '#3B82F6', 'descripcion' => 'Factura emitida'],
+            2 => ['nombre' => 'En Proceso', 'color' => '#F59E0B', 'descripcion' => 'En proceso de pago'],
+            3 => ['nombre' => 'Pagada', 'color' => '#10B981', 'descripcion' => 'Factura pagada'],
+            4 => ['nombre' => 'Vencida', 'color' => '#EF4444', 'descripcion' => 'Factura vencida'],
+            5 => ['nombre' => 'Anulada', 'color' => '#6B7280', 'descripcion' => 'Factura anulada']
+        ];
+        
+        $lineaTiempo = [];
+        $fechaInicio = null;
+        $fechaFin = null;
+        $estadoFinal = null;
+        $valorFactura = 0;
+        
+        foreach ($historiales as $historial) {
+            $fecha = $this->parsearFecha($historial->fecha);
+            if (!$fecha) continue;
+            
+            // Establecer fecha de inicio (primera emisión)
+            if (!$fechaInicio || ($historial->estado_id == 1 && $fecha < $fechaInicio)) {
+                $fechaInicio = $fecha;
+            }
+            
+            // Actualizar fecha fin y estado final
+            if (!$fechaFin || $fecha > $fechaFin) {
+                $fechaFin = $fecha;
+                $estadoFinal = $historial->estado_id;
+            }
+            
+            // Obtener valor de la factura del último historial con valor pagado
+            if ($historial->pagado > 0) {
+                $valorFactura = floatval($historial->pagado);
+            }
+            
+            // Agregar evento a la línea de tiempo
+            $periodo = $this->obtenerPeriodoParaFecha($fecha, $agruparPor);
+            $estadoInfo = $estados[$historial->estado_id] ?? ['nombre' => 'Desconocido', 'color' => '#6B7280', 'descripcion' => 'Estado desconocido'];
+            
+            $lineaTiempo[] = [
+                'fecha' => $fecha->format('Y-m-d'),
+                'periodo' => $periodo,
+                'estado_id' => $historial->estado_id,
+                'estado_nombre' => $estadoInfo['nombre'],
+                'estado_color' => $estadoInfo['color'],
+                'estado_descripcion' => $estadoInfo['descripcion'],
+                'factura_numero' => $numeroFactura,
+                'factura_valor' => floatval($historial->pagado),
+                'id_comercializacion' => $historial->idComercializacion
+            ];
+        }
+        
+        if (empty($lineaTiempo) || !$fechaInicio || !$fechaFin) {
+            return null;
+        }
+        
+        // Si no tenemos valor de la factura, intentar obtenerlo de cualquier historial
+        if ($valorFactura == 0) {
+            $historialesConValor = $historiales->where('pagado', '>', 0)->first();
+            if ($historialesConValor) {
+                $valorFactura = floatval($historialesConValor->pagado);
+            }
+        }
+        
+        // Calcular métricas de tiempo
+        $diasTranscurridos = $fechaInicio->diffInDays($fechaFin);
+        $estadoFinalInfo = $estados[$estadoFinal] ?? ['nombre' => 'Desconocido', 'color' => '#6B7280'];
+        
+        return [
+            'factura_numero' => $numeroFactura,
+            'factura_valor' => $valorFactura,
+            'fecha_inicio' => $fechaInicio->format('Y-m-d'),
+            'fecha_fin' => $fechaFin->format('Y-m-d'),
+            'dias_transcurridos' => $diasTranscurridos,
+            'estado_final' => $estadoFinal,
+            'estado_final_nombre' => $estadoFinalInfo['nombre'],
+            'estado_final_color' => $estadoFinalInfo['color'],
+            'eventos' => $lineaTiempo
+        ];
+    }
+    
+    /**
+     * Obtener período para una fecha según el tipo de agrupación
+     */
+    private function obtenerPeriodoParaFecha($fecha, $agruparPor)
+    {
+        switch ($agruparPor) {
+            case 'trimestre':
+                $trimestre = ceil($fecha->month / 3);
+                return $fecha->year . '-Q' . $trimestre;
+            case 'año':
+                return (string) $fecha->year;
+            case 'mes':
+            default:
+                return $fecha->format('Y-m');
+        }
+    }
+    
+    /**
+     * Consolidar datos de línea de tiempo por período
+     */
+    private function consolidarLineaTiempoPorPeriodo($datosLineaTiempo, $agruparPor)
+    {
+        $periodos = [];
+        $facturasEmitidas = []; // Rastrear facturas emitidas por período
+        $facturasPagadas = []; // Rastrear facturas pagadas por período
+        
+        // Primera pasada: recopilar información de todas las facturas
+        foreach ($datosLineaTiempo as $facturaData) {
+            $numeroFactura = $facturaData['factura_numero'];
+            $fechaEmision = null;
+            $fechaPago = null;
+            $valorFactura = $facturaData['factura_valor'];
+            
+            // Buscar fecha de emisión y pago en los eventos
+            foreach ($facturaData['eventos'] as $evento) {
+                if ($evento['estado_id'] == 1 && !$fechaEmision) { // Primera emisión
+                    $fechaEmision = $evento['fecha'];
+                }
+                if ($evento['estado_id'] == 3) { // Último pago
+                    $fechaPago = $evento['fecha'];
+                }
+            }
+            
+            // Asignar factura al período de emisión
+            if ($fechaEmision) {
+                $periodoEmision = $this->obtenerPeriodoParaFecha(Carbon::parse($fechaEmision), $agruparPor);
+                if (!isset($facturasEmitidas[$periodoEmision])) {
+                    $facturasEmitidas[$periodoEmision] = [];
+                }
+                $facturasEmitidas[$periodoEmision][] = [
+                    'numero' => $numeroFactura,
+                    'valor' => $valorFactura,
+                    'fecha_emision' => $fechaEmision
+                ];
+            }
+            
+            // Asignar factura al período de pago si está pagada
+            if ($fechaPago) {
+                $periodoPago = $this->obtenerPeriodoParaFecha(Carbon::parse($fechaPago), $agruparPor);
+                if (!isset($facturasPagadas[$periodoPago])) {
+                    $facturasPagadas[$periodoPago] = [];
+                }
+                $facturasPagadas[$periodoPago][] = [
+                    'numero' => $numeroFactura,
+                    'valor' => $valorFactura,
+                    'fecha_pago' => $fechaPago,
+                    'dias_transcurridos' => $facturaData['dias_transcurridos']
+                ];
+            }
+        }
+        
+        // Obtener todos los períodos únicos
+        $todosLosPeriodos = array_unique(array_merge(
+            array_keys($facturasEmitidas),
+            array_keys($facturasPagadas)
+        ));
+        sort($todosLosPeriodos);
+        
+        // Segunda pasada: calcular eventos por período (para mostrar actividad)
+        $eventosPorPeriodo = [];
+        foreach ($datosLineaTiempo as $facturaData) {
+            foreach ($facturaData['eventos'] as $evento) {
+                $periodo = $evento['periodo'];
+                
+                if (!isset($eventosPorPeriodo[$periodo])) {
+                    $eventosPorPeriodo[$periodo] = [
+                        'eventos_emision' => 0,
+                        'eventos_proceso' => 0,
+                        'eventos_pago' => 0,
+                        'eventos_vencida' => 0,
+                        'eventos_anulada' => 0
+                    ];
+                }
+                
+                switch ($evento['estado_id']) {
+                    case 1: $eventosPorPeriodo[$periodo]['eventos_emision']++; break;
+                    case 2: $eventosPorPeriodo[$periodo]['eventos_proceso']++; break;
+                    case 3: $eventosPorPeriodo[$periodo]['eventos_pago']++; break;
+                    case 4: $eventosPorPeriodo[$periodo]['eventos_vencida']++; break;
+                    case 5: $eventosPorPeriodo[$periodo]['eventos_anulada']++; break;
+                }
+            }
+        }
+        
+        // Crear estructura final por período
+        $periodosOrdenados = [];
+        foreach ($todosLosPeriodos as $periodo) {
+            $facturasEmitidasEnPeriodo = $facturasEmitidas[$periodo] ?? [];
+            $facturasPagadasEnPeriodo = $facturasPagadas[$periodo] ?? [];
+            $eventosEnPeriodo = $eventosPorPeriodo[$periodo] ?? [];
+            
+            $totalFacturasEmitidas = count($facturasEmitidasEnPeriodo);
+            $totalFacturasPagadas = count($facturasPagadasEnPeriodo);
+            
+            $valorTotalEmitidas = array_sum(array_column($facturasEmitidasEnPeriodo, 'valor'));
+            $valorTotalPagadas = array_sum(array_column($facturasPagadasEnPeriodo, 'valor'));
+            
+            // Calcular tiempo promedio de pago para facturas pagadas en este período
+            $tiemposPago = array_column($facturasPagadasEnPeriodo, 'dias_transcurridos');
+            $diasPromedioParaPago = count($tiemposPago) > 0 
+                ? round(array_sum($tiemposPago) / count($tiemposPago), 1) 
+                : 0;
+            
+            // Calcular porcentaje de facturas pagadas del total emitidas en este período
+            $porcentajePagadas = $totalFacturasEmitidas > 0 
+                ? round(($totalFacturasPagadas / $totalFacturasEmitidas) * 100, 1) 
+                : ($totalFacturasPagadas > 0 ? 'N/A (solo pagos)' : 0);
+            
+            $periodosOrdenados[] = [
+                'periodo' => $periodo,
+                'facturas_emitidas' => $totalFacturasEmitidas,
+                'facturas_pagadas' => $totalFacturasPagadas,
+                'eventos_emision' => $eventosEnPeriodo['eventos_emision'] ?? 0,
+                'eventos_en_proceso' => $eventosEnPeriodo['eventos_proceso'] ?? 0,
+                'eventos_pago' => $eventosEnPeriodo['eventos_pago'] ?? 0,
+                'eventos_vencida' => $eventosEnPeriodo['eventos_vencida'] ?? 0,
+                'eventos_anulada' => $eventosEnPeriodo['eventos_anulada'] ?? 0,
+                'valor_total_emitidas' => $valorTotalEmitidas,
+                'valor_total_pagadas' => $valorTotalPagadas,
+                'dias_promedio_para_pago' => $diasPromedioParaPago,
+                'porcentaje_pagadas' => $porcentajePagadas,
+                'nota' => $totalFacturasEmitidas == 0 && $totalFacturasPagadas > 0 
+                    ? 'Período con solo pagos de facturas emitidas en períodos anteriores' 
+                    : null
+            ];
+        }
+        
+        return $periodosOrdenados;
+    }
+    
+    /**
+     * Calcular resumen estadístico de la línea de tiempo
+     */
+    private function calcularResumenLineaTiempo($datosLineaTiempo)
+    {
+        $totalFacturas = count($datosLineaTiempo);
+        $facturasPagadas = 0;
+        $facturasVencidas = 0;
+        $valorTotalFacturas = 0;
+        $valorTotalPagado = 0;
+        $tiemposParaPago = [];
+        
+        foreach ($datosLineaTiempo as $facturaData) {
+            $valorTotalFacturas += $facturaData['factura_valor'];
+            
+            if ($facturaData['estado_final'] == 3) { // Pagada
+                $facturasPagadas++;
+                $valorTotalPagado += $facturaData['factura_valor'];
+                $tiemposParaPago[] = $facturaData['dias_transcurridos'];
+            } elseif ($facturaData['estado_final'] == 4) { // Vencida
+                $facturasVencidas++;
+            }
+        }
+        
+        $tiempoPromedioParaPago = count($tiemposParaPago) > 0 
+            ? round(array_sum($tiemposParaPago) / count($tiemposParaPago), 1) 
+            : 0;
+        
+        $tiempoMinimoParaPago = count($tiemposParaPago) > 0 ? min($tiemposParaPago) : 0;
+        $tiempoMaximoParaPago = count($tiemposParaPago) > 0 ? max($tiemposParaPago) : 0;
+        
+        return [
+            'total_facturas_analizadas' => $totalFacturas,
+            'facturas_pagadas' => $facturasPagadas,
+            'facturas_vencidas' => $facturasVencidas,
+            'facturas_pendientes' => $totalFacturas - $facturasPagadas - $facturasVencidas,
+            'porcentaje_pagadas' => $totalFacturas > 0 ? round(($facturasPagadas / $totalFacturas) * 100, 1) : 0,
+            'valor_total_facturas' => $valorTotalFacturas,
+            'valor_total_pagado' => $valorTotalPagado,
+            'porcentaje_valor_pagado' => $valorTotalFacturas > 0 ? round(($valorTotalPagado / $valorTotalFacturas) * 100, 1) : 0,
+            'tiempo_promedio_para_pago_dias' => $tiempoPromedioParaPago,
+            'tiempo_minimo_para_pago_dias' => $tiempoMinimoParaPago,
+            'tiempo_maximo_para_pago_dias' => $tiempoMaximoParaPago
+        ];
     }
 }
