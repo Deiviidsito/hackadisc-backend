@@ -96,6 +96,19 @@ Route::get('/analisis-comparativo', [\App\Http\Controllers\AnaliticasController:
 // Incluye: progresión temporal de estados, métricas de tiempo, valor por período
 Route::get('/linea-tiempo-comercializacion', [\App\Http\Controllers\AnaliticasController::class, 'obtenerLineaTiempoComercializacion']);
 
+// ==================== RUTAS FRONTEND SIMPLES ====================
+
+// GET /api/frontend/clientes - Lista simple de todos los clientes disponibles
+// Response: {"success": true, "data": {"clientes": ["SIEMENS", "EMPRESA XYZ", ...], "total": 25}}
+// Para poblar dropdowns o selectores en el frontend
+Route::get('/frontend/clientes', [\App\Http\Controllers\FrontEndController::class, 'obtenerListaClientes']);
+
+// GET /api/frontend/tiempo-promedio-proceso-pago/{cliente} - Tiempo promedio desde proceso hasta pago completo
+// Parámetro: nombre del cliente (URL encoded)
+// Response: {"success": true, "data": {"cliente_nombre": "...", "promedio_dias_proceso_a_pago": 45.5}}
+// Calcula tiempo desde estado "en proceso" (0) hasta facturas completamente pagadas (estado 3)
+Route::get('/frontend/tiempo-promedio-proceso-pago/{nombreCliente}', [\App\Http\Controllers\FrontEndController::class, 'tiempoPromedioProcesoAPago']);
+
 // ==================== RUTAS DE DASHBOARD POR CLIENTE ====================
 
 // GET /api/clientes-dashboard - Lista de todos los clientes con estadísticas básicas
