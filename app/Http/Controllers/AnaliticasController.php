@@ -806,4 +806,456 @@ class AnaliticasController extends Controller
             ]
         ];
     }
+    
+    /**
+     * Obtener estadísticas de dashboard por cliente específico
+     */
+    public function obtenerDashboardCliente($nombreCliente)
+    {
+        try {
+            set_time_limit(120);
+            ini_set('memory_limit', '256M');
+            
+            // Validar parámetros de entrada
+            $validacion = $this->validarParametrosDashboard($nombreCliente);
+            if (!$validacion['valido']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $validacion['error']
+                ], 400);
+            }
+            
+            // Decodificar nombre del cliente si viene por URL
+            $nombreCliente = urldecode($nombreCliente);
+            
+            // Obtener todas las ventas de este cliente
+            $ventas = Venta::where('NombreCliente', $nombreCliente)->get();
+            
+            if ($ventas->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Cliente no encontrado'
+                ], 404);
+            }
+            
+            // 1. Total de ventas realizadas a este cliente
+            $totalVentas = $ventas->count();
+            
+            // 2. Días desde inicio de comercialización hasta último cambio de estado en facturas
+            $diasComercializacion = $this->calcularDiasComercializacion($ventas);
+            
+            // 3. Estadísticas completas de facturas
+            $estadisticasFacturas = $this->calcularEstadisticasFacturas($ventas);
+            
+            // 4. Cantidad de ventas canceladas (estado 2)
+            $ventasCanceladas = $ventas->where('estado_venta_id', 2)->count();
+            
+            // 5. Total de ingresos recibidos (suma de ValorFinalComercializacion)
+            $totalIngresos = $ventas->sum('ValorFinalComercializacion');
+            
+            // Estadísticas adicionales útiles para el dashboard
+            $estadisticasAdicionales = $this->calcularEstadisticasAdicionales($ventas);
+            
+            // Información temporal del cliente
+            $primeraVenta = $ventas->min('FechaInicio');
+            $ultimaVenta = $ventas->max('FechaInicio');
+            $estadoActividad = $this->determinarEstadoActividad($ultimaVenta);
+            
+            // Calcular métricas de rendimiento
+            $diasActividad = $primeraVenta && $ultimaVenta ? Carbon::parse($primeraVenta)->diffInDays(Carbon::parse($ultimaVenta)) + 1 : 1;
+            $ventasPorMes = $diasActividad > 0 ? round(($totalVentas / max($diasActividad, 1)) * 30, 2) : 0;
+            $ingresosPorMes = $diasActividad > 0 ? round(($totalIngresos / max($diasActividad, 1)) * 30, 2) : 0;
+            
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'cliente_nombre' => $nombreCliente,
+                    'total_ventas' => $totalVentas,
+                    'dias_comercializacion' => $diasComercializacion,
+                    'facturas_estadisticas' => $estadisticasFacturas,
+                    'ventas_canceladas' => $ventasCanceladas,
+                    'total_ingresos' => floatval($totalIngresos),
+                    'estadisticas_adicionales' => $estadisticasAdicionales,
+                    'informacion_temporal' => [
+                        'primera_venta' => $primeraVenta,
+                        'ultima_venta' => $ultimaVenta,
+                        'dias_actividad' => $diasActividad,
+                        'estado_actividad' => $estadoActividad
+                    ],
+                    'metricas_rendimiento' => [
+                        'ventas_por_mes' => $ventasPorMes,
+                        'ingresos_por_mes' => $ingresosPorMes,
+                        'ticket_promedio' => $totalVentas > 0 ? round($totalIngresos / $totalVentas, 2) : 0,
+                        'conversion_facturas' => $totalVentas > 0 ? round(($estadisticasFacturas['total_facturas'] / $totalVentas) * 100, 2) : 0
+                    ]
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Error en dashboard cliente: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+            return response()->json([
+                'success' => false,
+                'error' => 'Error al generar estadísticas del cliente'
+            ], 500);
+        }
+    }
+    
+    /**
+     * Obtener lista de todos los clientes con estadísticas básicas
+     */
+    public function obtenerListaClientesDashboard()
+    {
+        try {
+            set_time_limit(120);
+            ini_set('memory_limit', '256M');
+            
+            // Obtener todos los clientes únicos con sus estadísticas básicas
+            $clientesEstadisticas = Venta::selectRaw('
+                NombreCliente,
+                COUNT(*) as total_ventas,
+                SUM(ValorFinalComercializacion) as total_ingresos,
+                SUM(CASE WHEN estado_venta_id = 2 THEN 1 ELSE 0 END) as ventas_canceladas,
+                MIN(FechaInicio) as primera_comercializacion,
+                MAX(FechaInicio) as ultima_comercializacion
+            ')
+            ->groupBy('NombreCliente')
+            ->orderBy('total_ingresos', 'desc')
+            ->get();
+            
+            $clientesConEstadisticas = [];
+            
+            foreach ($clientesEstadisticas as $cliente) {
+                // Calcular porcentaje de facturas pagadas para este cliente
+                $ventasCliente = Venta::where('NombreCliente', $cliente->NombreCliente)->get();
+                $estadisticasFacturas = $this->calcularEstadisticasFacturas($ventasCliente);
+                
+                $clientesConEstadisticas[] = [
+                    'nombre_cliente' => $cliente->NombreCliente,
+                    'total_ventas' => $cliente->total_ventas,
+                    'total_ingresos' => $cliente->total_ingresos,
+                    'ventas_canceladas' => $cliente->ventas_canceladas,
+                    'porcentaje_facturas_pagadas' => $estadisticasFacturas['porcentaje_pagadas'],
+                    'primera_comercializacion' => $cliente->primera_comercializacion,
+                    'ultima_comercializacion' => $cliente->ultima_comercializacion,
+                    'estado_actividad' => $this->determinarEstadoActividad($cliente->ultima_comercializacion)
+                ];
+            }
+            
+            return response()->json([
+                'success' => true,
+                'data' => $clientesConEstadisticas,
+                'total_clientes' => count($clientesConEstadisticas)
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Error en lista clientes dashboard: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => 'Error al obtener lista de clientes'
+            ], 500);
+        }
+    }
+    
+    /**
+     * Obtener lista de clientes con filtros y paginación avanzada
+     */
+    public function obtenerListaClientesDashboardAvanzado(Request $request)
+    {
+        try {
+            set_time_limit(180);
+            ini_set('memory_limit', '512M');
+            
+            // Parámetros de filtros y paginación
+            $limit = min($request->get('limit', 50), 200); // Máximo 200 elementos
+            $offset = $request->get('offset', 0);
+            $sortBy = $request->get('sort_by', 'total_ingresos'); // total_ventas, total_ingresos, porcentaje_facturas_pagadas, nombre_cliente
+            $order = $request->get('order', 'desc');
+            $estadoActividad = $request->get('estado_actividad'); // Activo, Poco Activo, Inactivo
+            $montoMinimo = $request->get('monto_minimo', 0);
+            $ventasMinimas = $request->get('ventas_minimas', 0);
+            
+            // Query base con filtros
+            $query = Venta::selectRaw('
+                NombreCliente,
+                COUNT(*) as total_ventas,
+                SUM(ValorFinalComercializacion) as total_ingresos,
+                SUM(CASE WHEN estado_venta_id = 2 THEN 1 ELSE 0 END) as ventas_canceladas,
+                MIN(FechaInicio) as primera_comercializacion,
+                MAX(FechaInicio) as ultima_comercializacion
+            ')
+            ->groupBy('NombreCliente')
+            ->havingRaw('SUM(ValorFinalComercializacion) >= ?', [$montoMinimo])
+            ->havingRaw('COUNT(*) >= ?', [$ventasMinimas]);
+            
+            // Obtener todos los datos para calcular estadísticas y filtros
+            $clientesEstadisticas = $query->get();
+            
+            $clientesConEstadisticas = [];
+            
+            foreach ($clientesEstadisticas as $cliente) {
+                // Calcular estadísticas de facturas para este cliente
+                $ventasCliente = Venta::where('NombreCliente', $cliente->NombreCliente)->get();
+                $estadisticasFacturas = $this->calcularEstadisticasFacturas($ventasCliente);
+                $estadoActividad = $this->determinarEstadoActividad($cliente->ultima_comercializacion);
+                
+                $clienteData = [
+                    'nombre_cliente' => $cliente->NombreCliente,
+                    'total_ventas' => $cliente->total_ventas,
+                    'total_ingresos' => floatval($cliente->total_ingresos),
+                    'ventas_canceladas' => $cliente->ventas_canceladas,
+                    'porcentaje_facturas_pagadas' => $estadisticasFacturas['porcentaje_pagadas'],
+                    'primera_comercializacion' => $cliente->primera_comercializacion,
+                    'ultima_comercializacion' => $cliente->ultima_comercializacion,
+                    'estado_actividad' => $estadoActividad,
+                    'estadisticas_facturas' => $estadisticasFacturas
+                ];
+                
+                // Filtrar por estado de actividad si se especifica
+                if (!$request->get('estado_actividad') || $estadoActividad === $request->get('estado_actividad')) {
+                    $clientesConEstadisticas[] = $clienteData;
+                }
+            }
+            
+            // Ordenar resultados
+            $validSortFields = ['total_ventas', 'total_ingresos', 'porcentaje_facturas_pagadas', 'nombre_cliente'];
+            if (in_array($sortBy, $validSortFields)) {
+                usort($clientesConEstadisticas, function($a, $b) use ($sortBy, $order) {
+                    $valueA = $a[$sortBy];
+                    $valueB = $b[$sortBy];
+                    
+                    if ($order === 'asc') {
+                        return $valueA <=> $valueB;
+                    } else {
+                        return $valueB <=> $valueA;
+                    }
+                });
+            }
+            
+            // Paginación
+            $totalClientes = count($clientesConEstadisticas);
+            $clientesPaginados = array_slice($clientesConEstadisticas, $offset, $limit);
+            
+            return response()->json([
+                'success' => true,
+                'data' => $clientesPaginados,
+                'pagination' => [
+                    'total_clientes' => $totalClientes,
+                    'limit' => $limit,
+                    'offset' => $offset,
+                    'has_more' => ($offset + $limit) < $totalClientes
+                ],
+                'filtros_aplicados' => [
+                    'estado_actividad' => $request->get('estado_actividad'),
+                    'monto_minimo' => $montoMinimo,
+                    'ventas_minimas' => $ventasMinimas,
+                    'sort_by' => $sortBy,
+                    'order' => $order
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Error en lista clientes dashboard avanzado: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => 'Error al obtener lista de clientes con filtros'
+            ], 500);
+        }
+    }
+    
+    /**
+     * Validar datos de entrada para métodos de dashboard
+     */
+    private function validarParametrosDashboard($nombreCliente)
+    {
+        if (empty($nombreCliente) || strlen($nombreCliente) < 2) {
+            return [
+                'valido' => false,
+                'error' => 'El nombre del cliente debe tener al menos 2 caracteres'
+            ];
+        }
+        
+        if (strlen($nombreCliente) > 255) {
+            return [
+                'valido' => false,
+                'error' => 'El nombre del cliente es demasiado largo'
+            ];
+        }
+        
+        return ['valido' => true];
+    }
+    
+    /**
+     * Calcular estadísticas de facturas (total, pagadas, porcentaje)
+     */
+    private function calcularEstadisticasFacturas($ventas)
+    {
+        $totalFacturas = 0;
+        $facturasPagadas = 0;
+        $facturasVencidas = 0;
+        $facturasConHistorial = 0;
+        $ingresosTotalFacturas = 0;
+        $ingresosPagados = 0;
+        
+        // Obtener todos los códigos de cotización de las ventas
+        $codigosCotizacion = $ventas->pluck('CodigoCotizacion')->unique();
+        
+        // Optimizar la consulta: obtener todas las facturas de una vez
+        $facturas = Factura::whereIn('numero', $codigosCotizacion)->get();
+        $totalFacturas = $facturas->count();
+        
+        // Calcular suma total de facturas
+        $ingresosTotalFacturas = $facturas->sum('valor');
+        
+        // Obtener todos los historiales de una vez para optimizar
+        $numeroFacturas = $facturas->pluck('numero');
+        $historialesPagados = HistorialEstadoFactura::whereIn('factura_numero', $numeroFacturas)
+            ->where('estado_id', 3) // Estado Pagada
+            ->pluck('factura_numero')
+            ->unique();
+        
+        $historialesVencidos = HistorialEstadoFactura::whereIn('factura_numero', $numeroFacturas)
+            ->where('estado_id', 4) // Estado Vencida (si existe)
+            ->pluck('factura_numero')
+            ->unique();
+        
+        $facturasConHistorial = HistorialEstadoFactura::whereIn('factura_numero', $numeroFacturas)
+            ->distinct('factura_numero')
+            ->count();
+        
+        foreach ($facturas as $factura) {
+            // Verificar si la factura está pagada
+            if ($historialesPagados->contains($factura->numero)) {
+                $facturasPagadas++;
+                $ingresosPagados += floatval($factura->valor);
+            }
+            
+            // Verificar si la factura está vencida
+            if ($historialesVencidos->contains($factura->numero)) {
+                $facturasVencidas++;
+            }
+        }
+        
+        $porcentajePagadas = $totalFacturas > 0 ? round(($facturasPagadas / $totalFacturas) * 100, 2) : 0;
+        $porcentajeIngresosPagados = $ingresosTotalFacturas > 0 ? round(($ingresosPagados / $ingresosTotalFacturas) * 100, 2) : 0;
+        
+        return [
+            'total_facturas' => $totalFacturas,
+            'facturas_pagadas' => $facturasPagadas,
+            'facturas_pendientes' => $totalFacturas - $facturasPagadas,
+            'facturas_vencidas' => $facturasVencidas,
+            'facturas_con_historial' => $facturasConHistorial,
+            'porcentaje_pagadas' => $porcentajePagadas,
+            'ingresos_total_facturas' => $ingresosTotalFacturas,
+            'ingresos_pagados' => $ingresosPagados,
+            'porcentaje_ingresos_pagados' => $porcentajeIngresosPagados,
+            'valor_promedio_factura' => $totalFacturas > 0 ? round($ingresosTotalFacturas / $totalFacturas, 2) : 0
+        ];
+    }
+    
+    /**
+     * Calcular días desde inicio de comercialización hasta último cambio de estado en facturas
+     */
+    private function calcularDiasComercializacion($ventas)
+    {
+        $fechaInicioMasAntigua = null;
+        $fechaUltimoCambioFactura = null;
+        $fechaUltimaVenta = null;
+        
+        foreach ($ventas as $venta) {
+            // Fecha de inicio más antigua
+            if (!$fechaInicioMasAntigua || $venta->FechaInicio < $fechaInicioMasAntigua) {
+                $fechaInicioMasAntigua = $venta->FechaInicio;
+            }
+            
+            // Guardar fecha de la venta más reciente como respaldo
+            if (!$fechaUltimaVenta || $venta->FechaInicio > $fechaUltimaVenta) {
+                $fechaUltimaVenta = $venta->FechaInicio;
+            }
+            
+            // Buscar la fecha más reciente de cambio de estado en las facturas de esta venta
+            $facturas = Factura::where('numero', $venta->CodigoCotizacion)->get();
+            
+            foreach ($facturas as $factura) {
+                $ultimoHistorial = HistorialEstadoFactura::where('factura_numero', $factura->numero)
+                    ->orderBy('fecha', 'desc')
+                    ->first();
+                
+                if ($ultimoHistorial && (!$fechaUltimoCambioFactura || $ultimoHistorial->fecha > $fechaUltimoCambioFactura)) {
+                    $fechaUltimoCambioFactura = $ultimoHistorial->fecha;
+                }
+            }
+        }
+        
+        // Si hay facturas con historial, usar la fecha más reciente de cambio de estado
+        if ($fechaInicioMasAntigua && $fechaUltimoCambioFactura) {
+            return Carbon::parse($fechaInicioMasAntigua)->diffInDays(Carbon::parse($fechaUltimoCambioFactura));
+        }
+        
+        // Si no hay facturas con historial, usar la diferencia entre primera y última venta
+        if ($fechaInicioMasAntigua && $fechaUltimaVenta && $fechaInicioMasAntigua !== $fechaUltimaVenta) {
+            return Carbon::parse($fechaInicioMasAntigua)->diffInDays(Carbon::parse($fechaUltimaVenta));
+        }
+        
+        // Si solo hay una venta o no hay datos, calcular días desde el inicio hasta hoy
+        if ($fechaInicioMasAntigua) {
+            return Carbon::parse($fechaInicioMasAntigua)->diffInDays(Carbon::now());
+        }
+        
+        return 0;
+    }
+    
+    /**
+     * Calcular estadísticas adicionales útiles para el dashboard
+     */
+    private function calcularEstadisticasAdicionales($ventas)
+    {
+        $estadosCounts = $ventas->groupBy('estado_venta_id')->map->count();
+        
+        // Calcular tiempo promedio de las ventas completadas
+        $ventasCompletadas = $ventas->whereIn('estado_venta_id', [1, 3]); // Terminada o Terminada SENCE
+        $tiempoPromedioCompletar = 0;
+        
+        if ($ventasCompletadas->count() > 0) {
+            $totalDias = 0;
+            foreach ($ventasCompletadas as $venta) {
+                // Buscar el último historial de estado para esta venta
+                $ultimoEstado = \App\Models\HistorialEstadoVenta::where('venta_id', $venta->id)
+                    ->orderBy('fecha', 'desc')
+                    ->first();
+                
+                if ($ultimoEstado) {
+                    $totalDias += Carbon::parse($venta->FechaInicio)->diffInDays(Carbon::parse($ultimoEstado->fecha));
+                }
+            }
+            $tiempoPromedioCompletar = round($totalDias / $ventasCompletadas->count(), 1);
+        }
+        
+        return [
+            'ventas_en_proceso' => $estadosCounts->get(0, 0),
+            'ventas_terminadas' => $estadosCounts->get(1, 0),
+            'ventas_terminadas_sence' => $estadosCounts->get(3, 0),
+            'ventas_reprogramadas' => $estadosCounts->get(6, 0),
+            'ventas_perdidas' => $estadosCounts->get(7, 0),
+            'tiempo_promedio_completar_dias' => $tiempoPromedioCompletar,
+            'valor_promedio_comercializacion' => $ventas->avg('ValorFinalComercializacion'),
+            'ticket_promedio' => round($ventas->avg('ValorFinalComercializacion'), 0)
+        ];
+    }
+    
+    /**
+     * Determinar estado de actividad del cliente
+     */
+    private function determinarEstadoActividad($ultimaComercializacion)
+    {
+        $diasSinActividad = Carbon::parse($ultimaComercializacion)->diffInDays(Carbon::now());
+        
+        if ($diasSinActividad <= 30) {
+            return 'Activo';
+        } elseif ($diasSinActividad <= 90) {
+            return 'Poco Activo';
+        } else {
+            return 'Inactivo';
+        }
+    }
 }

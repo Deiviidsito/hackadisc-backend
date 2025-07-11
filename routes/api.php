@@ -90,6 +90,24 @@ Route::get('/distribucion-pagos', [\App\Http\Controllers\AnaliticasController::c
 
 Route::get('/analisis-comparativo', [\App\Http\Controllers\AnaliticasController::class, 'obtenerAnalisisComparativo']);
 
+// ==================== RUTAS DE DASHBOARD POR CLIENTE ====================
+
+// GET /api/clientes-dashboard - Lista de todos los clientes con estadísticas básicas
+// Response: {"success": true, "data": [...], "total_clientes": 25}
+// Incluye: total_ventas, total_ingresos, ventas_canceladas, porcentaje_facturas_pagadas, estado_actividad
+Route::get('/clientes-dashboard', [\App\Http\Controllers\AnaliticasController::class, 'obtenerListaClientesDashboard']);
+
+// GET /api/clientes-dashboard-avanzado - Lista de clientes con filtros y paginación
+// Parámetros opcionales: limit, offset, sort_by, order, estado_actividad, monto_minimo, ventas_minimas
+// Response: {"success": true, "data": [...], "pagination": {...}, "filtros_aplicados": {...}}
+Route::get('/clientes-dashboard-avanzado', [\App\Http\Controllers\AnaliticasController::class, 'obtenerListaClientesDashboardAvanzado']);
+
+// GET /api/cliente-dashboard/{nombre} - Dashboard completo de un cliente específico
+// Parámetro: nombre del cliente (URL encoded)
+// Response: {"success": true, "data": {"cliente_nombre": "...", "total_ventas": 143, ...}}
+// Incluye: total_ventas, dias_comercializacion, facturas_estadisticas, ventas_canceladas, total_ingresos
+Route::get('/cliente-dashboard/{nombreCliente}', [\App\Http\Controllers\AnaliticasController::class, 'obtenerDashboardCliente']);
+
 // ==================== NOTAS PARA FRONTEND ====================
 /*
 ESTRUCTURA COMÚN DE RESPUESTAS:

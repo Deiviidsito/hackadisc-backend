@@ -378,6 +378,121 @@ Compara estadísticas entre dos períodos de tiempo específicos.
 }
 ```
 
+## Nuevos Endpoints de Dashboard por Cliente
+
+### 7. Lista de Clientes para Dashboard
+
+**GET** `/api/clientes-dashboard`
+
+Obtiene una lista de todos los clientes con estadísticas básicas para mostrar en una vista general del dashboard.
+
+**Respuesta:**
+
+```json
+{
+    "success": true,
+    "data": [
+        {
+            "nombre_cliente": "TechCorp Solutions",
+            "total_ventas": 143,
+            "total_ingresos": 2850000,
+            "ventas_canceladas": 12,
+            "porcentaje_facturas_pagadas": 87.2,
+            "primera_comercializacion": "2023-01-15",
+            "ultima_comercializacion": "2024-12-20",
+            "estado_actividad": "Activo"
+        },
+        {
+            "nombre_cliente": "Innovación Global S.A.",
+            "total_ventas": 89,
+            "total_ingresos": 1650000,
+            "ventas_canceladas": 8,
+            "porcentaje_facturas_pagadas": 92.1,
+            "primera_comercializacion": "2023-03-10",
+            "ultima_comercializacion": "2024-11-30",
+            "estado_actividad": "Activo"
+        }
+    ],
+    "total_clientes": 45
+}
+```
+
+### 8. Dashboard Completo de Cliente Específico
+
+**GET** `/api/cliente-dashboard/{nombreCliente}`
+
+Obtiene estadísticas completas de un cliente específico para mostrar en su dashboard individual.
+
+**Parámetro:**
+
+-   `nombreCliente` (string): Nombre del cliente (URL encoded si contiene espacios)
+
+**Ejemplo:** `/api/cliente-dashboard/TechCorp%20Solutions`
+
+**Respuesta:**
+
+```json
+{
+    "success": true,
+    "data": {
+        "cliente_nombre": "TechCorp Solutions",
+        "total_ventas": 143,
+        "dias_comercializacion": 425,
+        "facturas_estadisticas": {
+            "total_facturas": 156,
+            "facturas_pagadas": 136,
+            "facturas_pendientes": 20,
+            "porcentaje_pagadas": 87.2
+        },
+        "ventas_canceladas": 12,
+        "total_ingresos": 2850000,
+        "estadisticas_adicionales": {
+            "ventas_en_proceso": 15,
+            "ventas_terminadas": 98,
+            "ventas_terminadas_sence": 18,
+            "ventas_reprogramadas": 0,
+            "ventas_perdidas": 0,
+            "tiempo_promedio_completar_dias": 45.3,
+            "valor_promedio_comercializacion": 19930,
+            "ticket_promedio": 19930
+        }
+    }
+}
+```
+
+### Interpretación de Métricas del Dashboard:
+
+#### Métricas Principales:
+
+-   **total_ventas**: Cantidad total de comercializaciones realizadas con este cliente
+-   **dias_comercializacion**: Días transcurridos desde la primera comercialización hasta el último cambio de estado en facturas
+-   **facturas_estadisticas**: Resumen del estado de todas las facturas del cliente
+-   **ventas_canceladas**: Cantidad de ventas que fueron canceladas (estado 2)
+-   **total_ingresos**: Suma total de todos los valores finales de comercialización
+
+#### Estados de Actividad:
+
+-   **Activo**: Última comercialización hace ≤30 días
+-   **Poco Activo**: Última comercialización hace 31-90 días
+-   **Inactivo**: Última comercialización hace >90 días
+
+#### Estados de Venta:
+
+-   **En Proceso** (0): Ventas que aún están siendo desarrolladas
+-   **Terminada** (1): Ventas completadas listas para facturar
+-   **Cancelada** (2): Ventas que fueron canceladas
+-   **Terminada SENCE** (3): Ventas con facturación parcial SENCE
+-   **Reprogramada** (6): Ventas que fueron reprogramadas
+-   **Perdida** (7): Ventas que se perdieron
+
+#### Casos de Uso para Frontend:
+
+1. **Vista de Lista**: Usar `/clientes-dashboard` para mostrar tabla con todos los clientes
+2. **Dashboard Individual**: Usar `/cliente-dashboard/{nombre}` para vista detallada
+3. **Filtros Sugeridos**: Por estado_actividad, rango de ingresos, porcentaje de facturas pagadas
+4. **Ordenamiento**: Por total_ingresos, total_ventas, porcentaje_facturas_pagadas
+5. **Alertas**: Clientes con porcentaje_facturas_pagadas <70% o estado "Inactivo"
+
 ## Interpretación de Métricas para Toma de Decisiones
 
 ### Análisis de Flujo de Caja
