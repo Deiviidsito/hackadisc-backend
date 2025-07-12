@@ -1,0 +1,105 @@
+[
+    {
+        "idComercializacion": 12345,
+        "CodigoCotizacion": "CTZ-2024-001",
+        "FechaInicio": "01/01/2024",
+        "ClienteId": 1001,
+        "NombreCliente": "Empresa Demo S.A.S",
+        "CorreoCreador": "vendedor@empresa.com",
+        "ValorFinalComercializacion": 15000000,
+        "ValorFinalCotizacion": 14500000,
+        "NumeroEstados": 3,
+        "Estados": [
+            {
+                "EstadoComercializacion": 1,
+                "Fecha": "01/01/2024"
+            },
+            {
+                "EstadoComercializacion": 2,
+                "Fecha": "15/01/2024"
+            },
+            {
+                "EstadoComercializacion": 3,
+                "Fecha": "30/01/2024"
+            }
+        ],
+        "Facturas": [
+            {
+                "numero": "FACT-001-2024",
+                "FechaFacturacion": "30/01/2024",
+                "NumeroEstadosFactura": 2,
+                "EstadosFactura": [
+                    {
+                        "estado": 1,
+                        "Fecha": "30/01/2024",
+                        "Pagado": 0,
+                        "Observacion": "Factura generada",
+                        "Usuario": "admin@empresa.com"
+                    },
+                    {
+                        "estado": 2,
+                        "Fecha": "15/02/2024",
+                        "Pagado": 15000000,
+                        "Observacion": "Pago completado",
+                        "Usuario": "admin@empresa.com"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "idComercializacion": 12346,
+        "CodigoCotizacion": "ADI-2024-002",
+        "FechaInicio": "02/01/2024",
+        "ClienteId": 1002,
+        "NombreCliente": "Cliente Filtrado",
+        "CorreoCreador": "vendedor2@empresa.com",
+        "ValorFinalComercializacion": 5000000,
+        "ValorFinalCotizacion": 4800000,
+        "NumeroEstados": 1,
+        "Estados": [
+            {
+                "EstadoComercializacion": 1,
+                "Fecha": "02/01/2024"
+            }
+        ],
+        "Facturas": []
+    },
+    {
+        "idComercializacion": 12347,
+        "CodigoCotizacion": "CTZ-2024-003",
+        "FechaInicio": "03/01/2024",
+        "ClienteId": 1003,
+        "NombreCliente": "Otra Empresa Ltd",
+        "CorreoCreador": "vendedor3@empresa.com",
+        "ValorFinalComercializacion": 25000000,
+        "ValorFinalCotizacion": 24000000,
+        "NumeroEstados": 2,
+        "Estados": [
+            {
+                "EstadoComercializacion": 1,
+                "Fecha": "03/01/2024"
+            },
+            {
+                "EstadoComercializacion": 2,
+                "Fecha": "18/01/2024"
+            }
+        ],
+        "Facturas": [
+            {
+                "numero": "FACT-002-2024",
+                "FechaFacturacion": "18/01/2024",
+                "NumeroEstadosFactura": 1,
+                "EstadosFactura": [
+                    {
+                        "estado": 1,
+                        "Fecha": "18/01/2024",
+                        "Pagado": 0,
+                        "Observacion": "Factura pendiente de pago",
+                        "Usuario": "admin@empresa.com"
+                    }
+                ]
+            }
+        ]
+    }
+]

@@ -12,6 +12,12 @@ return new class extends Migration
             $table->string('numero')->primary();
             $table->date('FechaFacturacion');
             $table->unsignedInteger('NumeroEstadosFactura')->default(0);
+            $table->decimal('valor', 15, 2)->nullable(); // Valor total de la factura
+            
+            // RELACIÓN CON COMERCIALIZACIÓN (VENTA)
+            $table->unsignedBigInteger('idComercializacion')->index();
+            $table->foreign('idComercializacion')->references('idComercializacion')->on('ventas')->onDelete('cascade');
+            
             $table->timestamps();
         });
     }
