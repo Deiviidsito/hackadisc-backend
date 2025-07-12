@@ -57,7 +57,19 @@ Route::post('/api/ventas/calcular-julio-2024', [VentasTotalesController::class, 
 // Ruta para calcular desde archivo JSON
 Route::post('/api/ventas/calcular-desde-json', [VentasTotalesController::class, 'calcularVentasTotalesDesdeJson']);
 
-// ==================== RUTAS DE VENTAS TOTALES ====================
+// Ruta para debugging (no requiere parámetros)
+Route::get('/api/ventas/debug-julio-2024', [VentasTotalesController::class, 'debugCalculoVentasJulio2024']);
+
+// Ruta para calcular desde base de datos (si ya tienes datos importados)
+Route::post('ventas/calcular-julio-2024', [VentasTotalesController::class, 'calcularVentasTotalesJulio2024']);
+
+// Ruta para calcular desde archivo JSON (replica exacta del Python)
+Route::post('ventas/calcular-desde-json', [VentasTotalesController::class, 'calcularVentasTotalesDesdeJson']);
+
+// Ruta para debugging rápido (NO requiere parámetros)
+Route::get('ventas/debug-julio-2024', [VentasTotalesController::class, 'debugCalculoVentasJulio2024']);
+
+// ==================== NUEVAS RUTAS: VENTAS TOTALES POR MES ====================
 
 // POST /api/ventas/calcular-por-mes - CÁLCULO DE VENTAS TOTALES POR MES
 // 🧮 CARACTERÍSTICAS:
