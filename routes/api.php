@@ -6,6 +6,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\VentasTotalesController;
 use App\Http\Controllers\TiempoEtapasController;
+use App\Http\Controllers\TiempoFacturacionController;
+use App\Http\Controllers\TiempoPagoController;
+use App\Http\Controllers\TipoFlujoController;
 use App\Http\Controllers\DebugController;
 
 // ==================== RUTAS DE AUTENTICACIÓN ====================
@@ -14,43 +17,8 @@ Route::get('user', [AuthController::class, 'getUser']);
 Route::post('logout', [AuthController::class, 'logout']);
 Route::get('admin/users', [AuthController::class, 'getAllUsers']);
 
-// ==================== RUTAS DE IMPORTACIÓN ULTRA-OPTIMIZADA ====================
-
-// POST /api/importarUsuariosJson - SISTEMA ULTRA-OPTIMIZADO PARA DATA CENTER
-// 🚀 OPTIMIZACIONES IMPLEMENTADAS:
-// - Streaming con buffer circular para archivos de 200MB+
-// - Procesamiento vectorizado sin loops PHP lentos
-// - Bulk operations con prepared statements (5000 registros/lote)
-// - Memory mapping y zero-copy operations
-// - Deduplicación O(1) con hash indexing
-// - Garbage collection agresivo
-// - Objetivo: Reducir de 4+ minutos a <30 segundos
-//
-// Body: form-data con campo "archivos[]" (máximo 20 archivos de 200MB cada uno)
-// Extrae usuarios del campo "CorreoCreador" del JSON
-// Nombre: parte antes del @ del email (sanitizado)
-// Response: {"success": true, "data": {"usuarios_creados": 5000, "rendimiento": {...}}}
 Route::post('importarUsuariosJson', [ImportController::class, 'importarUsuariosJson']);
 
-// POST /api/importarVentasJson - IMPORTACIÓN MASIVA DE DATOS COMPLETOS
-// 🚀 ULTRA-OPTIMIZADO PARA DATASETS COMPLEJOS CON RELACIONES:
-// - Procesa ventas (comercializaciones) con todas sus relaciones
-// - Maneja clientes, facturas, estados de ventas, historial de facturas
-// - Filtrado inteligente: Excluye códigos que inician con ADI*, OTR*, SPD*
-// - Streaming para archivos masivos (500MB+) con relaciones complejas
-// - Bulk operations para múltiples tablas relacionadas (5000 registros/lote)
-// - Precarga optimizada de datos existentes con índices hash O(1)
-// - Transacciones atómicas para consistencia de datos relacionados
-// - Objetivo: Procesar datasets complejos con relaciones en <60 segundos
-//
-// Body: form-data con campo "archivos[]" (máximo 20 archivos de 500MB cada uno)
-// Estructura JSON esperada: Array de objetos con:
-// - idComercializacion, CodigoCotizacion, FechaInicio
-// - ClienteId, NombreCliente, CorreoCreador
-// - ValorFinalComercializacion, ValorFinalCotizacion
-// - Estados: Array con EstadoComercializacion, Fecha
-// - Facturas: Array con numero, FechaFacturacion, EstadosFactura[]
-// Response: {"success": true, "data": {"ventas_creadas": X, "clientes_creados": Y, "facturas_creadas": Z, ...}}
 Route::post('importarVentasJson', [ImportController::class, 'importarVentasJson']);
 
 // Ruta para calcular desde base de datos
@@ -114,6 +82,100 @@ Route::post('tiempo-etapas/distribucion', [TiempoEtapasController::class, 'obten
 // - Muestra estadísticas básicas y ejemplos de datos
 // - Útil para debugging y validación
 Route::get('tiempo-etapas/verificar-bd', [TiempoEtapasController::class, 'verificarBaseDatos']);
+
+// ==================== RUTAS DE ANÁLISIS TIEMPO TERMINACIÓN → FACTURACIÓN ====================
+
+// POST /api/tiempo-facturacion/promedio - ANÁLISIS TIEMPO TERMINACIÓN → PRIMERA FACTURA
+// 💰 FUNCIONALIDADES:
+// - Calcula tiempo desde estado 1 (Terminada) hasta primera factura emitida
+// - Usa fecha más reciente del estado 1 como punto de inicio
+// - Identifica primera factura usando FechaFacturacion del JSON
+// - Distingue entre facturas SENCE y facturas cliente
+// - Filtros por año, mes, tipo de factura
+// - Estadísticas completas: promedio, mediana, distribución
+// Body: {"año": 2024, "mes": 10, "tipo_factura": "todas|sence|cliente"}
+Route::post('tiempo-facturacion/promedio', [TiempoFacturacionController::class, 'calcularTiempoTerminacionFacturacion']);
+
+// POST /api/tiempo-facturacion/por-cliente - ANÁLISIS FACTURACIÓN POR CLIENTE
+// 👥 CARACTERÍSTICAS:
+// - Tiempo promedio de facturación por cliente
+// - Estadísticas por tipo de factura (SENCE vs Cliente)
+// - Identificación de clientes con facturación más lenta/rápida
+// - Valor total de comercializaciones por cliente
+// Body: {"año": 2024, "mes": 10, "tipo_factura": "todas"}
+Route::post('tiempo-facturacion/por-cliente', [TiempoFacturacionController::class, 'analizarTiemposPorCliente']);
+
+// POST /api/tiempo-facturacion/distribucion - DISTRIBUCIÓN TIEMPOS FACTURACIÓN
+// 📊 CARACTERÍSTICAS:
+// - Rangos específicos para facturación (mismo día, 1-3 días, etc.)
+// - Porcentajes y ejemplos por rango
+// - Análisis de eficiencia en proceso de facturación
+// - Identificación de patrones y cuellos de botella
+// Body: {"año": 2024, "tipo_factura": "todas"}
+Route::post('tiempo-facturacion/distribucion', [TiempoFacturacionController::class, 'obtenerDistribucionTiempos']);
+
+// ==================== RUTAS DE ANÁLISIS TIEMPO FACTURACIÓN → PAGO ====================
+
+// POST /api/tiempo-pago/promedio - ANÁLISIS TIEMPO FACTURACIÓN → PAGO EFECTIVO
+// 💵 FUNCIONALIDADES:
+// - Calcula tiempo desde emisión de factura hasta recepción de pago efectivo
+// - Identifica último estado 3 (Pagado) con monto > 0 como fecha de pago
+// - Distingue entre facturas SENCE y facturas cliente
+// - Identifica facturas pendientes de pago y morosidad
+// - Análisis de flujo de efectivo y tiempos de cobro
+// Body: {"año": 2024, "mes": 10, "tipo_factura": "todas", "incluir_pendientes": false}
+Route::post('tiempo-pago/promedio', [TiempoPagoController::class, 'calcularTiempoFacturacionPago']);
+
+// POST /api/tiempo-pago/morosidad - ANÁLISIS MOROSIDAD POR CLIENTE
+// 🚨 CARACTERÍSTICAS:
+// - Comportamiento de pago por cliente individual
+// - Porcentaje de facturas pagadas vs pendientes
+// - Días promedio de retraso en pagos
+// - Clasificación de morosidad (excelente, bueno, regular, malo, crítico)
+// - Montos totales pagados y pendientes por cliente
+// Body: {"año": 2024, "tipo_factura": "todas"}
+Route::post('tiempo-pago/morosidad', [TiempoPagoController::class, 'analizarMorosidadPorCliente']);
+
+// POST /api/tiempo-pago/distribucion - DISTRIBUCIÓN TIEMPOS DE PAGO
+// 📊 CARACTERÍSTICAS:
+// - Rangos específicos para tiempos de pago (inmediato, 1-7 días, 8-15, etc.)
+// - Identificación facturas críticas (>90 días sin pago)
+// - Análisis de eficiencia en cobros
+// - Patrones de comportamiento de pago por tipo de factura
+// Body: {"año": 2024, "tipo_factura": "todas"}
+Route::post('tiempo-pago/distribucion', [TiempoPagoController::class, 'obtenerDistribucionTiemposPago']);
+
+// ==================== RUTAS DE ANÁLISIS TIPOS DE FLUJO COMERCIALIZACIÓN ====================
+
+// POST /api/tipo-flujo/analizar - ANÁLISIS COMPARATIVO TIPOS DE FLUJO
+// 🔄 FUNCIONALIDADES:
+// - Detecta automáticamente tipo de flujo: Completo (0→3→1) vs Simple (0→1)
+// - Compara tiempos promedio entre flujos con/sin financiamiento SENCE
+// - Analiza valores promedio y número de facturas por tipo
+// - Identifica preferencias de clientes por tipo de financiamiento
+// - Métricas de eficiencia y adopción de cada flujo
+// Body: {"año": 2024, "mes": 10}
+Route::post('tipo-flujo/analizar', [TipoFlujoController::class, 'analizarTiposFlujo']);
+
+// POST /api/tipo-flujo/preferencias - ANÁLISIS PREFERENCIAS CLIENTES POR FLUJO
+// 👥 CARACTERÍSTICAS:
+// - Comportamiento individual de cada cliente por tipo de flujo
+// - Clasificación de preferencias: fuerte/leve hacia cada flujo o mixto
+// - Valores promedio por cliente según tipo de flujo elegido
+// - Identificación clientes que solo usan un tipo vs mixtos
+// - Estadísticas de adopción de financiamiento SENCE por cliente
+// Body: {"año": 2024, "mes": 10}
+Route::post('tipo-flujo/preferencias', [TipoFlujoController::class, 'analizarPreferenciasClientes']);
+
+// POST /api/tipo-flujo/eficiencia - ANÁLISIS EFICIENCIA POR TIPO DE FLUJO
+// ⚡ CARACTERÍSTICAS:
+// - Comparativa eficiencia operacional entre flujos
+// - Tiempos desarrollo, facturación y pago por tipo
+// - Tasas de pago y morosidad comparativas
+// - Recomendaciones basadas en eficiencia
+// - Impacto del financiamiento SENCE en el proceso
+// Body: {"año": 2024, "mes": 10}
+Route::post('tipo-flujo/eficiencia', [TipoFlujoController::class, 'analizarEficienciaPorFlujo']);
 
 // ==================== RUTAS DE DEBUG ====================
 Route::get('debug/test-basico', [DebugController::class, 'testBasico']);
