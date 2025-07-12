@@ -138,30 +138,16 @@ class ImportController extends Controller
             }
             
             $tiempoTotal = round(microtime(true) - $startTime, 2);
-            $memoryPeak = round(memory_get_peak_usage(true) / 1024 / 1024, 2);
             $totalUsuarios = $resultados['usuarios_creados'] + $resultados['usuarios_actualizados'];
             
-            Log::info("🎉 IMPORTACIÓN COMPLETADA - RENDIMIENTO EXTREMO", [
+            Log::info("🎉 IMPORTACIÓN DE USUARIOS COMPLETADA", [
                 'tiempo_total_segundos' => $tiempoTotal,
-                'memoria_pico_mb' => $memoryPeak,
-                'usuarios_procesados' => $totalUsuarios,
-                'velocidad_usuarios_por_segundo' => $totalUsuarios > 0 ? round($totalUsuarios / $tiempoTotal) : 0,
-                'mejora_rendimiento' => $tiempoTotal < 30 ? '✅ OBJETIVO CUMPLIDO' : '⚠️ NECESITA OPTIMIZACIÓN'
+                'usuarios_procesados' => $totalUsuarios
             ]);
             
             return response()->json([
                 'success' => true,
-                'message' => '🚀 Importación ultra-optimizada completada',
-                'data' => array_merge($resultados, [
-                    'rendimiento' => [
-                        'tiempo_total_segundos' => $tiempoTotal,
-                        'memoria_pico_mb' => $memoryPeak,
-                        'usuarios_por_segundo' => $totalUsuarios > 0 ? round($totalUsuarios / $tiempoTotal) : 0,
-                        'objetivo_30s_cumplido' => $tiempoTotal <= 30,
-                        'optimizacion_nivel' => 'DATA_CENTER_EXTREME'
-                    ],
-                    'fecha_importacion' => now()->toISOString()
-                ])
+                'message' => '🚀 Importación de usuarios completada con máximo rendimiento'
             ]);
             
         } catch (\Exception $e) {
@@ -728,16 +714,7 @@ class ImportController extends Controller
             
             return response()->json([
                 'success' => true,
-                'message' => '🚀 Importación masiva de datos completada con máximo rendimiento',
-                'data' => array_merge($resultados, [
-                    'rendimiento' => [
-                        'tiempo_total_segundos' => $tiempoTotal,
-                        'memoria_pico_mb' => $memoryPeak,
-                        'ventas_por_segundo' => $totalProcesado > 0 ? round($totalProcesado / $tiempoTotal) : 0,
-                        'optimizacion_nivel' => 'DATA_CENTER_COMPLEX_RELATIONS'
-                    ],
-                    'fecha_importacion' => now()->toISOString()
-                ])
+                'message' => '🚀 Importación masiva de datos completada con máximo rendimiento'
             ]);
             
         } catch (\Exception $e) {
