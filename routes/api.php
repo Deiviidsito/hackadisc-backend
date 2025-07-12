@@ -12,6 +12,7 @@ use App\Http\Controllers\TiempoFacturacionController;
 use App\Http\Controllers\TiempoPagoController;
 use App\Http\Controllers\TipoFlujoController;
 use App\Http\Controllers\DebugController;
+use App\Http\Controllers\ClienteAnalyticsController;
 
 // ==================== RUTAS DE AUTENTICACIÓN ====================
 Route::post('login', [AuthController::class, 'login']);
@@ -198,8 +199,340 @@ Route::post('tipo-flujo/preferencias', [TipoFlujoController::class, 'analizarPre
 // Body: {"año": 2024, "mes": 10}
 Route::post('tipo-flujo/eficiencia', [TipoFlujoController::class, 'analizarEficienciaPorFlujo']);
 
+// ==================== RUTAS DE ANÁLISIS DE CLIENTES ====================
+
+// GET /api/clientes/listar - LISTA COMPLETA DE CLIENTES CON ESTADÍSTICAS
+// 📋 CARACTERÍSTICAS:
+// - Lista todos los clientes con información básica
+// - Incluye estadísticas: total ventas, facturas, valor comercializaciones
+// - Estado de actividad basado en última venta
+// - Resumen general del sistema
+// - Ideal para selector de clientes en dashboard
+Route::get('clientes/listar', [ClienteAnalyticsController::class, 'listarClientes']);
+
+// GET /api/clientes/{id}/analytics - DASHBOARD COMPLETO POR CLIENTE
+// 📊 CARACTERÍSTICAS:
+// - Analíticas completas y personalizadas por cliente
+// - Resumen general, ventas históricas, análisis de tiempos
+// - Comportamiento de facturación y pagos
+// - Tendencias temporales y comparativa con mercado
+// - Análisis de flujos comerciales (SENCE vs directo)
+// - Métricas de morosidad y clasificaciones
+Route::get('clientes/{id}/analytics', [ClienteAnalyticsController::class, 'analyticsCliente']);
+
+// GET /api/clientes/{id}/comparar?cliente_comparacion={id2} - COMPARAR DOS CLIENTES
+// 🔍 CARACTERÍSTICAS:
+// - Comparativa detallada entre dos clientes específicos
+// - Métricas lado a lado: ventas, valores, tiempos
+// - Análisis de diferencias y fortalezas relativas
+// - Identificación de patrones diferenciales
+// - Útil para benchmarking y análisis competitivo interno
+Route::get('clientes/{id}/comparar', [ClienteAnalyticsController::class, 'compararClientes']);
+
 // ==================== RUTAS DE DEBUG ====================
 Route::get('debug/test-basico', [DebugController::class, 'testBasico']);
 Route::get('debug/test-tablas', [DebugController::class, 'testTablas']);
 Route::get('debug/test-join', [DebugController::class, 'testJoin']);
 Route::get('debug/analizar-estructura', [DebugController::class, 'analizarEstructuraCompleta']);
+
+// ==================== RUTAS GET PARA DASHBOARD - DATOS COMPLETOS ====================
+// 📱 ENDPOINTS GET SIMPLIFICADOS PARA INTEGRACIÓN FRONTEND RÁPIDA
+// 🎯 Todos los endpoints retornan TODA la base de datos sin filtros de fecha
+// 🚀 Ideales para cargar dashboards con filtrado dinámico en el frontend
+
+// GET /api/dashboard/ventas-mes - VENTAS POR MES (TODOS LOS AÑOS)
+// 📊 Datos completos: todos los años y meses disponibles
+Route::get('dashboard/ventas-mes', function() {
+    return app(VentasTotalesController::class)->calcularVentasTotalesPorMes(new \Illuminate\Http\Request([]));
+});
+
+// GET /api/dashboard/resumen-anual - RESUMEN ANUAL COMPLETO
+Route::get('dashboard/resumen-anual', function() {
+    return app(VentasTotalesController::class)->resumenVentasPorAño(new \Illuminate\Http\Request());
+});
+
+// GET /api/dashboard/tiempo-pago-promedio - TIEMPO PROMEDIO DE PAGO (TODOS LOS DATOS)
+// 💵 Datos completos: todos los años, todas las facturas, incluye pendientes
+Route::get('dashboard/tiempo-pago-promedio', function() {
+    return app(TiempoPagoController::class)->calcularTiempoFacturacionPago(new \Illuminate\Http\Request([
+        'tipo_factura' => 'todas',
+        'incluir_pendientes' => true
+    ]));
+});
+
+// GET /api/dashboard/distribucion-pagos - DISTRIBUCIÓN DE TIEMPOS DE PAGO (TODOS LOS DATOS)
+// 📊 Datos completos: todos los años, todas las facturas
+Route::get('dashboard/distribucion-pagos', function() {
+    return app(TiempoPagoController::class)->obtenerDistribucionTiemposPago(new \Illuminate\Http\Request([
+        'tipo_factura' => 'todas'
+    ]));
+});
+
+// GET /api/dashboard/morosidad-clientes - ANÁLISIS DE MOROSIDAD POR CLIENTE (TODOS LOS DATOS)
+// 🚨 Datos completos: todos los años, todas las facturas
+Route::get('dashboard/morosidad-clientes', function() {
+    return app(TiempoPagoController::class)->analizarMorosidadPorCliente(new \Illuminate\Http\Request([
+        'tipo_factura' => 'todas'
+    ]));
+});
+
+// GET /api/dashboard/tiempo-etapas - TIEMPO PROMEDIO ENTRE ETAPAS (TODOS LOS DATOS)
+// ⏱️ Datos completos: todos los años y meses, sin detalles
+Route::get('dashboard/tiempo-etapas', function() {
+    return app(TiempoEtapasController::class)->calcularTiempoPromedioEtapas(new \Illuminate\Http\Request([
+        'incluir_detalles' => false
+    ]));
+});
+
+// GET /api/dashboard/etapas-por-cliente - ANÁLISIS DE ETAPAS POR CLIENTE (TODOS LOS DATOS)
+// 👥 Datos completos: todos los años y meses
+Route::get('dashboard/etapas-por-cliente', function() {
+    return app(TiempoEtapasController::class)->analizarTiemposPorCliente(new \Illuminate\Http\Request([]));
+});
+
+// GET /api/dashboard/distribucion-etapas - DISTRIBUCIÓN DE TIEMPOS DE ETAPAS (TODOS LOS DATOS)
+// 📊 Datos completos: todos los años y meses
+Route::get('dashboard/distribucion-etapas', function() {
+    return app(TiempoEtapasController::class)->obtenerDistribucionTiempos(new \Illuminate\Http\Request([]));
+});
+
+// GET /api/dashboard/tiempo-facturacion - TIEMPO TERMINACIÓN → FACTURACIÓN (TODOS LOS DATOS)
+// 💰 Datos completos: todos los años, todas las facturas
+Route::get('dashboard/tiempo-facturacion', function() {
+    return app(TiempoFacturacionController::class)->calcularTiempoTerminacionFacturacion(new \Illuminate\Http\Request([
+        'tipo_factura' => 'todas'
+    ]));
+});
+
+// GET /api/dashboard/facturacion-por-cliente - FACTURACIÓN POR CLIENTE (TODOS LOS DATOS)
+// 👥 Datos completos: todos los años, todas las facturas
+Route::get('dashboard/facturacion-por-cliente', function() {
+    return app(TiempoFacturacionController::class)->analizarTiemposPorCliente(new \Illuminate\Http\Request([
+        'tipo_factura' => 'todas'
+    ]));
+});
+
+// GET /api/dashboard/distribucion-facturacion - DISTRIBUCIÓN TIEMPOS FACTURACIÓN (TODOS LOS DATOS)
+// 📊 Datos completos: todos los años, todas las facturas
+Route::get('dashboard/distribucion-facturacion', function() {
+    return app(TiempoFacturacionController::class)->obtenerDistribucionTiempos(new \Illuminate\Http\Request([
+        'tipo_factura' => 'todas'
+    ]));
+});
+
+// GET /api/dashboard/tipos-flujo - ANÁLISIS TIPOS DE FLUJO COMERCIALIZACIÓN (TODOS LOS DATOS)
+// 🔄 Datos completos: todos los años y meses
+Route::get('dashboard/tipos-flujo', function() {
+    return app(TipoFlujoController::class)->analizarTiposFlujo(new \Illuminate\Http\Request([]));
+});
+
+// GET /api/dashboard/preferencias-flujo - PREFERENCIAS DE CLIENTES POR FLUJO (TODOS LOS DATOS)
+// 👥 Datos completos: todos los años y meses
+Route::get('dashboard/preferencias-flujo', function() {
+    return app(TipoFlujoController::class)->analizarPreferenciasClientes(new \Illuminate\Http\Request([]));
+});
+
+// GET /api/dashboard/eficiencia-flujo - EFICIENCIA POR TIPO DE FLUJO (TODOS LOS DATOS)
+// ⚡ Datos completos: todos los años y meses
+Route::get('dashboard/eficiencia-flujo', function() {
+    return app(TipoFlujoController::class)->analizarEficienciaPorFlujo(new \Illuminate\Http\Request([]));
+});
+
+// GET /api/dashboard/pago-tiempo-completo - ANÁLISIS TIEMPO DE PAGO COMPLETO (TODOS LOS DATOS)
+// ⏱️ Datos completos: todos los años
+Route::get('dashboard/pago-tiempo-completo', function() {
+    return app(PagoInicioVentaController::class)->analizarTiempoPagoCompleto(new \Illuminate\Http\Request([]));
+});
+
+// GET /api/dashboard/clientes-lista - LISTA DE CLIENTES PARA SELECTOR
+// 👥 Lista completa de clientes con estadísticas básicas para selector frontend
+Route::get('dashboard/clientes-lista', function() {
+    return app(ClienteAnalyticsController::class)->listarClientes();
+});
+
+// GET /api/dashboard/clientes-simple - LISTA SIMPLE DE CLIENTES (DEBUGGING)
+// 👥 Lista básica solo con nombres para verificar funcionamiento
+Route::get('dashboard/clientes-simple', function() {
+    try {
+        $clientes = \App\Models\Cliente::select('id', 'NombreCliente')->orderBy('NombreCliente')->get();
+        return response()->json([
+            'success' => true,
+            'datos' => $clientes,
+            'total' => $clientes->count()
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage()
+        ], 500);
+    }
+});
+
+// GET /api/dashboard/cliente-test - TEST ANALÍTICAS DE CLIENTE ESPECÍFICO
+// 📊 Endpoint de prueba para verificar analíticas de un cliente
+Route::get('dashboard/cliente-test', function() {
+    try {
+        return app(ClienteAnalyticsController::class)->analyticsCliente(1);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage()
+        ], 500);
+    }
+});
+
+// ==================== ENDPOINTS GET CON PARÁMETROS DE CONSULTA ====================
+// 🔧 ENDPOINTS GET FLEXIBLES QUE ACEPTAN QUERY PARAMETERS
+// 📋 Permiten personalización mediante parámetros en la URL
+
+// GET /api/dashboard/ventas-mes-custom?año=2024&mes_inicio=1&mes_fin=12
+Route::get('dashboard/ventas-mes-custom', function(\Illuminate\Http\Request $request) {
+    $año = $request->query('año', 2024);
+    $mes_inicio = $request->query('mes_inicio', 1);
+    $mes_fin = $request->query('mes_fin', 12);
+    
+    return app(VentasTotalesController::class)->calcularVentasTotalesPorMes(new \Illuminate\Http\Request([
+        'año' => $año,
+        'mes_inicio' => $mes_inicio,
+        'mes_fin' => $mes_fin
+    ]));
+});
+
+// GET /api/dashboard/tiempo-pago-custom?año=2024&mes=10&tipo_factura=todas&incluir_pendientes=false
+Route::get('dashboard/tiempo-pago-custom', function(\Illuminate\Http\Request $request) {
+    $año = $request->query('año', 2024);
+    $mes = $request->query('mes');
+    $tipo_factura = $request->query('tipo_factura', 'todas');
+    $incluir_pendientes = $request->query('incluir_pendientes', false);
+    
+    $params = ['año' => $año, 'tipo_factura' => $tipo_factura, 'incluir_pendientes' => $incluir_pendientes];
+    if ($mes) $params['mes'] = $mes;
+    
+    return app(TiempoPagoController::class)->calcularTiempoFacturacionPago(new \Illuminate\Http\Request($params));
+});
+
+// GET /api/dashboard/morosidad-custom?año=2024&tipo_factura=todas
+Route::get('dashboard/morosidad-custom', function(\Illuminate\Http\Request $request) {
+    $año = $request->query('año', 2024);
+    $tipo_factura = $request->query('tipo_factura', 'todas');
+    
+    return app(TiempoPagoController::class)->analizarMorosidadPorCliente(new \Illuminate\Http\Request([
+        'año' => $año,
+        'tipo_factura' => $tipo_factura
+    ]));
+});
+
+// GET /api/dashboard/etapas-custom?año=2024&mes_inicio=1&mes_fin=12&incluir_detalles=false
+Route::get('dashboard/etapas-custom', function(\Illuminate\Http\Request $request) {
+    $año = $request->query('año', 2024);
+    $mes_inicio = $request->query('mes_inicio', 1);
+    $mes_fin = $request->query('mes_fin', 12);
+    $incluir_detalles = $request->query('incluir_detalles', false);
+    
+    return app(TiempoEtapasController::class)->calcularTiempoPromedioEtapas(new \Illuminate\Http\Request([
+        'año' => $año,
+        'mes_inicio' => $mes_inicio,
+        'mes_fin' => $mes_fin,
+        'incluir_detalles' => $incluir_detalles
+    ]));
+});
+
+// GET /api/dashboard/facturacion-custom?año=2024&mes=10&tipo_factura=todas
+Route::get('dashboard/facturacion-custom', function(\Illuminate\Http\Request $request) {
+    $año = $request->query('año', 2024);
+    $mes = $request->query('mes', 10);
+    $tipo_factura = $request->query('tipo_factura', 'todas');
+    
+    return app(TiempoFacturacionController::class)->calcularTiempoTerminacionFacturacion(new \Illuminate\Http\Request([
+        'año' => $año,
+        'mes' => $mes,
+        'tipo_factura' => $tipo_factura
+    ]));
+});
+
+// GET /api/dashboard/tipos-flujo-custom?año=2024&mes=10
+Route::get('dashboard/tipos-flujo-custom', function(\Illuminate\Http\Request $request) {
+    $año = $request->query('año', 2024);
+    $mes = $request->query('mes', 10);
+    
+    return app(TipoFlujoController::class)->analizarTiposFlujo(new \Illuminate\Http\Request([
+        'año' => $año,
+        'mes' => $mes
+    ]));
+});
+
+// ==================== ENDPOINT GET PARA DASHBOARD COMPLETO ====================
+// 🎯 ENDPOINT ESPECIAL QUE RETORNA TODOS LOS DATOS DEL DASHBOARD EN UNA SOLA LLAMADA
+// 🚀 IDEAL PARA CARGAR EL DASHBOARD COMPLETO CON TODOS LOS DATOS HISTÓRICOS
+
+// GET /api/dashboard/completo - DATOS COMPLETOS DEL DASHBOARD
+// 📊 Retorna todas las métricas de TODA la base de datos en una sola respuesta
+Route::get('dashboard/completo', function() {
+    try {
+        // Crear requests sin filtros de fecha para obtener todos los datos
+        $requestTodas = new \Illuminate\Http\Request(['tipo_factura' => 'todas', 'incluir_pendientes' => true]);
+        $requestVacio = new \Illuminate\Http\Request([]);
+        $requestSinDetalles = new \Illuminate\Http\Request(['incluir_detalles' => false]);
+        
+        // Recopilar todos los datos históricos
+        $dashboardData = [
+            'timestamp' => now()->toISOString(),
+            'alcance' => 'todos_los_datos_historicos',
+            'ventas' => [
+                'por_mes' => app(VentasTotalesController::class)->calcularVentasTotalesPorMes($requestVacio)->getData(),
+                'resumen_anual' => app(VentasTotalesController::class)->resumenVentasPorAño($requestVacio)->getData()
+            ],
+            'tiempo_pago' => [
+                'promedio' => app(TiempoPagoController::class)->calcularTiempoFacturacionPago($requestTodas)->getData(),
+                'distribucion' => app(TiempoPagoController::class)->obtenerDistribucionTiemposPago($requestTodas)->getData(),
+                'morosidad' => app(TiempoPagoController::class)->analizarMorosidadPorCliente($requestTodas)->getData()
+            ],
+            'tiempo_etapas' => [
+                'promedio' => app(TiempoEtapasController::class)->calcularTiempoPromedioEtapas($requestSinDetalles)->getData(),
+                'por_cliente' => app(TiempoEtapasController::class)->analizarTiemposPorCliente($requestVacio)->getData(),
+                'distribucion' => app(TiempoEtapasController::class)->obtenerDistribucionTiempos($requestVacio)->getData()
+            ],
+            'facturacion' => [
+                'promedio' => app(TiempoFacturacionController::class)->calcularTiempoTerminacionFacturacion($requestTodas)->getData(),
+                'por_cliente' => app(TiempoFacturacionController::class)->analizarTiemposPorCliente($requestTodas)->getData(),
+                'distribucion' => app(TiempoFacturacionController::class)->obtenerDistribucionTiempos($requestTodas)->getData()
+            ],
+            'tipos_flujo' => [
+                'analisis' => app(TipoFlujoController::class)->analizarTiposFlujo($requestVacio)->getData(),
+                'preferencias' => app(TipoFlujoController::class)->analizarPreferenciasClientes($requestVacio)->getData(),
+                'eficiencia' => app(TipoFlujoController::class)->analizarEficienciaPorFlujo($requestVacio)->getData()
+            ],
+            'pago_completo' => app(PagoInicioVentaController::class)->analizarTiempoPagoCompleto($requestVacio)->getData()
+        ];
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Dashboard completo cargado exitosamente con todos los datos históricos',
+            'datos' => $dashboardData,
+            'metadata' => [
+                'endpoints_incluidos' => 13,
+                'alcance_datos' => 'completo_sin_filtros_fecha',
+                'tiempo_generacion' => now()->toISOString()
+            ]
+        ]);
+        
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error al cargar dashboard completo',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+});
+
+// ==================== RUTAS DE ANALÍTICAS DE CLIENTES ====================
+Route::prefix('clientes-analytics')->group(function () {
+    // Listar todos los clientes disponibles para analíticas
+    Route::get('/', [ClienteAnalyticsController::class, 'listarClientes']);
+    
+    // Obtener analíticas detalladas de un cliente específico
+    Route::get('/{clienteId}/analytics', [ClienteAnalyticsController::class, 'analyticsCliente']);
+    
+    // Comparar dos clientes
+    Route::get('/{clienteId1}/compare/{clienteId2}', [ClienteAnalyticsController::class, 'compararClientes']);
+});
