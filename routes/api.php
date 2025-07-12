@@ -2,9 +2,10 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ImportController;
+use App\Http\Controllers\VentasTotalesController;
+use App\Http\Controllers\PagoInicioVentaController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\VentasTotalesController;
 use App\Http\Controllers\TiempoEtapasController;
 use App\Http\Controllers\TiempoFacturacionController;
 use App\Http\Controllers\TiempoPagoController;
@@ -45,6 +46,15 @@ Route::post('ventas/calcular-por-mes', [VentasTotalesController::class, 'calcula
 // - Promedios y métricas de rendimiento
 Route::get('ventas/resumen-anual', [VentasTotalesController::class, 'resumenVentasPorAño']);
 
+// ==================== RUTAS DE ANÁLISIS DE PAGO ====================
+
+// POST /api/pagos/analizar-tiempo-completo - ANÁLISIS DE TIEMPO DE PAGO
+// ⏱️ CARACTERÍSTICAS:
+// - Calcula tiempo promedio desde FechaInicio hasta pago completo
+// - Filtros por año, rango de fechas (sin estado_venta - filtros internos automáticos)
+// - Estadísticas: mediana, mínimo, máximo de días
+// - Interpretación del análisis para mejor comprensión
+Route::post('pagos/analizar-tiempo-completo', [PagoInicioVentaController::class, 'analizarTiempoPagoCompleto']);
 // ==================== RUTAS DE ANÁLISIS TIEMPO ENTRE ETAPAS ====================
 
 // POST /api/tiempo-etapas/promedio - ANÁLISIS TIEMPO PROMEDIO ENTRE ETAPAS
