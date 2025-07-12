@@ -33,10 +33,17 @@ class Venta extends Model
         return $this->belongsTo(Factura::class, 'CodigoCotizacion', 'numero');
     }
 
+<<<<<<< HEAD
     // Venta → Cliente
     public function cliente()
     {
         return $this->belongsTo(Cliente::class, 'ClienteId', 'id');
+=======
+    // Venta → Cliente (usando InsecapClienteId)
+    public function cliente()
+    {
+        return $this->belongsTo(Cliente::class, 'ClienteId', 'InsecapClienteId');
+>>>>>>> dev
     }
 
     // Venta → Usuario
