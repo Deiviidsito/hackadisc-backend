@@ -191,3 +191,4 @@ Route::post('tipo-flujo/eficiencia', [TipoFlujoController::class, 'analizarEfici
 Route::get('debug/test-basico', [DebugController::class, 'testBasico']);
 Route::get('debug/test-tablas', [DebugController::class, 'testTablas']);
 Route::get('debug/test-join', [DebugController::class, 'testJoin']);
+Route::get('debug/analizar-estructura', [DebugController::class, 'analizarEstructuraCompleta']);

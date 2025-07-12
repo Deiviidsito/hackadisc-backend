@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 /**
@@ -46,20 +47,20 @@ class TiempoPagoController extends Controller
             $startTime = microtime(true);
             Log::info("⏱️ INICIANDO CÁLCULO TIEMPO FACTURACIÓN → PAGO");
             
-            // Cargar datos del JSON
-            $jsonData = $this->cargarDatosJSON();
-            if (!$jsonData) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No se pudo cargar el archivo JSON de datos'
-                ], 500);
-            }
-            
             // Parámetros de filtrado
             $año = $request->input('año', null);
             $mes = $request->input('mes', null);
             $tipoFactura = $request->input('tipo_factura', 'todas'); // 'sence', 'cliente', 'todas'
             $incluirPendientes = $request->input('incluir_pendientes', false);
+            
+            // Cargar datos desde la base de datos en lugar del JSON
+            $comercializacionesData = $this->cargarDatosBaseDatos($año, $mes);
+            if (!$comercializacionesData) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudieron cargar los datos de la base de datos'
+                ], 500);
+            }
             
             $comercializacionesAnalizadas = 0;
             $facturasAnalizadas = 0;
@@ -76,13 +77,13 @@ class TiempoPagoController extends Controller
                 'monto_total_pendiente' => 0
             ];
             
-            foreach ($jsonData as $comercializacion) {
+            foreach ($comercializacionesData as $comercializacion) {
                 $comercializacionesAnalizadas++;
                 
-                // Aplicar filtros de fecha
-                if (!$this->cumpleFiltrosFecha($comercializacion, $año, $mes)) {
-                    continue;
-                }
+                // Los filtros de fecha ya se aplicaron en la consulta DB
+                // if (!$this->cumpleFiltrosFecha($comercializacion, $año, $mes)) {
+                //     continue;
+                // }
                 
                 // Verificar si tiene facturas
                 if (!isset($comercializacion['Facturas']) || empty($comercializacion['Facturas'])) {
@@ -107,7 +108,7 @@ class TiempoPagoController extends Controller
                     if (!isset($factura['FechaFacturacion'])) continue;
                     
                     try {
-                        $fechaFacturacion = Carbon::createFromFormat('d/m/Y', $factura['FechaFacturacion']);
+                        $fechaFacturacion = Carbon::createFromFormat('Y-m-d', $factura['FechaFacturacion']);
                     } catch (\Exception $e) {
                         continue;
                     }
@@ -129,7 +130,7 @@ class TiempoPagoController extends Controller
                         $detallesFacturas[] = [
                             'codigo_cotizacion' => $comercializacion['CodigoCotizacion'],
                             'cliente' => $comercializacion['NombreCliente'],
-                            'numero_factura' => $factura['numero'],
+                            'numero_factura' => $factura['NumeroFactura'],
                             'fecha_facturacion' => $factura['FechaFacturacion'],
                             'fecha_pago' => $fechaPago->format('d/m/Y'),
                             'dias_pago' => $diasDiferencia,
@@ -149,7 +150,7 @@ class TiempoPagoController extends Controller
                             $detallesFacturas[] = [
                                 'codigo_cotizacion' => $comercializacion['CodigoCotizacion'],
                                 'cliente' => $comercializacion['NombreCliente'],
-                                'numero_factura' => $factura['numero'],
+                                'numero_factura' => $factura['NumeroFactura'],
                                 'fecha_facturacion' => $factura['FechaFacturacion'],
                                 'fecha_pago' => null,
                                 'dias_pendientes' => $diasPendientes,
@@ -198,7 +199,7 @@ class TiempoPagoController extends Controller
                 'metadata' => [
                     'tiempo_ejecucion_ms' => $tiempoEjecucion,
                     'timestamp' => now()->format('Y-m-d H:i:s'),
-                    'total_registros_json' => count($jsonData)
+                    'total_registros_json' => count($comercializacionesData)
                 ]
             ]);
             
@@ -224,11 +225,11 @@ class TiempoPagoController extends Controller
     public function analizarMorosidadPorCliente(Request $request)
     {
         try {
-            $jsonData = $this->cargarDatosJSON();
-            if (!$jsonData) {
+            $comercializacionesData = $this->cargarDatosBaseDatos();
+            if (!$comercializacionesData) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No se pudo cargar el archivo JSON de datos'
+                    'message' => 'No se pudo cargar los datos de la base de datos'
                 ], 500);
             }
             
@@ -238,7 +239,7 @@ class TiempoPagoController extends Controller
             
             $clientesData = [];
             
-            foreach ($jsonData as $comercializacion) {
+            foreach ($comercializacionesData as $comercializacion) {
                 if (!$this->cumpleFiltrosFecha($comercializacion, $año, $mes)) {
                     continue;
                 }
@@ -282,7 +283,7 @@ class TiempoPagoController extends Controller
                         $clientesData[$clienteNombre]['facturas_pagadas']++;
                         
                         try {
-                            $fechaFacturacion = Carbon::createFromFormat('d/m/Y', $factura['FechaFacturacion']);
+                            $fechaFacturacion = Carbon::createFromFormat('Y-m-d', $factura['FechaFacturacion']);
                             $diasPago = $fechaFacturacion->diffInDays($fechaPago);
                             $clientesData[$clienteNombre]['tiempos_pago'][] = $diasPago;
                             $clientesData[$clienteNombre]['monto_total_pagado'] += $this->obtenerMontoPagado($factura);
@@ -293,7 +294,7 @@ class TiempoPagoController extends Controller
                         $clientesData[$clienteNombre]['facturas_pendientes']++;
                         
                         try {
-                            $fechaFacturacion = Carbon::createFromFormat('d/m/Y', $factura['FechaFacturacion']);
+                            $fechaFacturacion = Carbon::createFromFormat('Y-m-d', $factura['FechaFacturacion']);
                             $diasPendientes = $fechaFacturacion->diffInDays(Carbon::now());
                             $clientesData[$clienteNombre]['dias_pendientes_acumulados'] += $diasPendientes;
                             $clientesData[$clienteNombre]['monto_total_pendiente'] += $this->calcularMontoPendiente($factura, $comercializacion['ValorFinalComercializacion'] ?? 0);
@@ -372,11 +373,11 @@ class TiempoPagoController extends Controller
     public function obtenerDistribucionTiemposPago(Request $request)
     {
         try {
-            $jsonData = $this->cargarDatosJSON();
-            if (!$jsonData) {
+            $comercializacionesData = $this->cargarDatosBaseDatos();
+            if (!$comercializacionesData) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No se pudo cargar el archivo JSON de datos'
+                    'message' => 'No se pudo cargar los datos desde la base de datos'
                 ], 500);
             }
             
@@ -387,7 +388,7 @@ class TiempoPagoController extends Controller
             $tiemposPago = [];
             $detallesPorRango = [];
             
-            foreach ($jsonData as $comercializacion) {
+            foreach ($comercializacionesData as $comercializacion) {
                 if (!$this->cumpleFiltrosFecha($comercializacion, $año, $mes)) {
                     continue;
                 }
@@ -412,7 +413,7 @@ class TiempoPagoController extends Controller
                     if (!$fechaPago) continue; // Solo facturas pagadas
                     
                     try {
-                        $fechaFacturacion = Carbon::createFromFormat('d/m/Y', $factura['FechaFacturacion']);
+                        $fechaFacturacion = Carbon::createFromFormat('Y-m-d', $factura['FechaFacturacion']);
                         $diasPago = $fechaFacturacion->diffInDays($fechaPago);
                         
                         $tiemposPago[] = $diasPago;
@@ -426,7 +427,7 @@ class TiempoPagoController extends Controller
                         $detallesPorRango[$rango][] = [
                             'codigo_cotizacion' => $comercializacion['CodigoCotizacion'],
                             'cliente' => $comercializacion['NombreCliente'],
-                            'numero_factura' => $factura['numero'],
+                            'numero_factura' => $factura['NumeroFactura'],
                             'dias_pago' => $diasPago,
                             'monto_pagado' => $this->obtenerMontoPagado($factura),
                             'tipo_factura' => $tipoFacturaDetectado
@@ -515,7 +516,7 @@ class TiempoPagoController extends Controller
         if (!$año && !$mes) return true;
         
         try {
-            $fechaInicio = Carbon::createFromFormat('d/m/Y', $comercializacion['FechaInicio']);
+            $fechaInicio = Carbon::createFromFormat('Y-m-d', $comercializacion['FechaInicio']);
             
             if ($año && $fechaInicio->year != $año) {
                 return false;
@@ -541,8 +542,8 @@ class TiempoPagoController extends Controller
             foreach ($comercializacion['Estados'] as $estado) {
                 if ($estado['EstadoComercializacion'] == 3) {
                     try {
-                        $fechaEstado3 = Carbon::createFromFormat('d/m/Y', $estado['Fecha']);
-                        $fechaFactura = Carbon::createFromFormat('d/m/Y', $factura['FechaFacturacion']);
+                        $fechaEstado3 = Carbon::createFromFormat('Y-m-d', $estado['fecha']);
+                        $fechaFactura = Carbon::createFromFormat('Y-m-d', $factura['FechaFacturacion']);
                         
                         // Si la factura se emite el mismo día o muy cerca del estado 3, es SENCE
                         if ($fechaFactura->diffInDays($fechaEstado3) <= 2) {
@@ -559,8 +560,11 @@ class TiempoPagoController extends Controller
         if (isset($factura['EstadosFactura'])) {
             $montoMaximo = 0;
             foreach ($factura['EstadosFactura'] as $estadoFactura) {
-                if (isset($estadoFactura['Pagado']) && $estadoFactura['Pagado'] > $montoMaximo) {
-                    $montoMaximo = $estadoFactura['Pagado'];
+                if (isset($estadoFactura['pagado'])) {
+                    $montoPagado = $this->convertirPagadoANumero($estadoFactura['pagado']);
+                    if ($montoPagado > $montoMaximo) {
+                        $montoMaximo = $montoPagado;
+                    }
                 }
             }
             
@@ -585,12 +589,12 @@ class TiempoPagoController extends Controller
         $fechasPago = [];
         
         foreach ($factura['EstadosFactura'] as $estadoFactura) {
-            if ($estadoFactura['estado'] == 3 && 
-                isset($estadoFactura['Pagado']) && 
-                $estadoFactura['Pagado'] > 0) {
+            if ($estadoFactura['estado_id'] == 3 && 
+                isset($estadoFactura['pagado']) && 
+                $this->esFacturaPagada($estadoFactura['pagado'])) {
                 
                 try {
-                    $fecha = Carbon::createFromFormat('d/m/Y', $estadoFactura['Fecha']);
+                    $fecha = Carbon::createFromFormat('Y-m-d', $estadoFactura['fecha']);
                     $fechasPago[] = $fecha;
                 } catch (\Exception $e) {
                     continue;
@@ -618,10 +622,10 @@ class TiempoPagoController extends Controller
         $montoPagado = 0;
         
         foreach ($factura['EstadosFactura'] as $estadoFactura) {
-            if ($estadoFactura['estado'] == 3 && 
-                isset($estadoFactura['Pagado']) && 
-                $estadoFactura['Pagado'] > 0) {
-                $montoPagado += $estadoFactura['Pagado'];
+            if ($estadoFactura['estado_id'] == 3 && 
+                isset($estadoFactura['pagado']) && 
+                $this->esFacturaPagada($estadoFactura['pagado'])) {
+                $montoPagado += $this->convertirPagadoANumero($estadoFactura['pagado']);
             }
         }
         
@@ -813,5 +817,199 @@ class TiempoPagoController extends Controller
         }, $array)) / count($array);
         
         return round(sqrt($variance), 2);
+    }
+    
+    /**
+     * CARGAR DATOS DESDE BASE DE DATOS
+     * 
+     * Carga comercializaciones desde la base de datos con sus facturas y estados de facturas
+     * especializando en información de pagos
+     */
+    private function cargarDatosBaseDatos($año = null, $mes = null)
+    {
+        try {
+            Log::info("🔍 Cargando datos desde BD para análisis de pagos - Año: " . ($año ?? 'todos') . ", Mes: " . ($mes ?? 'todos'));
+            
+            // Query para obtener ventas con filtros de fecha
+            $queryBase = "
+                SELECT 
+                    v.idVenta,
+                    v.idComercializacion,
+                    v.CodigoCotizacion,
+                    v.FechaInicio,
+                    v.ClienteId,
+                    v.NombreCliente,
+                    v.ValorFinalComercializacion,
+                    v.CorreoCreador,
+                    v.estado_venta_id as estado_actual
+                FROM ventas v
+                WHERE 1=1
+                    -- Excluir prefijos específicos
+                    AND v.CodigoCotizacion NOT LIKE 'ADI%'
+                    AND v.CodigoCotizacion NOT LIKE 'OTR%' 
+                    AND v.CodigoCotizacion NOT LIKE 'SPD%'
+            ";
+            
+            // Aplicar filtros de fecha
+            if ($año) {
+                $queryBase .= " AND YEAR(v.FechaInicio) = {$año}";
+            }
+            
+            if ($mes) {
+                $queryBase .= " AND MONTH(v.FechaInicio) = {$mes}";
+            }
+            
+            $queryBase .= " ORDER BY v.FechaInicio DESC";
+            
+            $ventas = DB::select($queryBase);
+            
+            Log::info("📊 Encontradas " . count($ventas) . " ventas");
+            
+            // Cargar facturas con sus estados de pago
+            $comercializacionesIds = array_column($ventas, 'idComercializacion');
+            $facturas = [];
+            
+            if (!empty($comercializacionesIds)) {
+                $queryFacturas = "
+                    SELECT 
+                        f.numero as NumeroFactura,
+                        f.FechaFacturacion,
+                        f.valor as MontoFactura,
+                        f.idComercializacion
+                    FROM facturas f
+                    WHERE f.idComercializacion IN (" . implode(',', $comercializacionesIds) . ")
+                    ORDER BY f.idComercializacion, f.FechaFacturacion ASC
+                ";
+                
+                $resultadosFacturas = DB::select($queryFacturas);
+                
+                // Cargar estados de facturas (especialmente estados de pago)
+                $facturasNumeros = array_column($resultadosFacturas, 'NumeroFactura');
+                $estadosFacturas = [];
+                
+                if (!empty($facturasNumeros)) {
+                    $facturasNumerosStr = "'" . implode("','", $facturasNumeros) . "'";
+                    
+                    $queryEstadosFacturas = "
+                        SELECT 
+                            hef.factura_numero,
+                            hef.estado_id,
+                            hef.fecha,
+                            hef.pagado,
+                            hef.observacion,
+                            ef.nombre as nombre_estado
+                        FROM historial_estados_factura hef
+                        INNER JOIN estado_facturas ef ON hef.estado_id = ef.id
+                        WHERE hef.factura_numero IN ({$facturasNumerosStr})
+                        ORDER BY hef.factura_numero, hef.fecha ASC
+                    ";
+                    
+                    $resultadosEstados = DB::select($queryEstadosFacturas);
+                    
+                    // Organizar por número de factura
+                    foreach ($resultadosEstados as $estado) {
+                        $estadosFacturas[$estado->factura_numero][] = [
+                            'estado_id' => $estado->estado_id,
+                            'fecha' => $estado->fecha,
+                            'pagado' => $estado->pagado,
+                            'observacion' => $estado->observacion,
+                            'nombre_estado' => $estado->nombre_estado
+                        ];
+                    }
+                    
+                    Log::info("💰 Cargados estados de pago para " . count($estadosFacturas) . " facturas");
+                }
+                
+                // Organizar facturas por comercialización incluyendo sus estados
+                foreach ($resultadosFacturas as $factura) {
+                    $facturaCompleta = [
+                        'NumeroFactura' => $factura->NumeroFactura,
+                        'FechaFacturacion' => $factura->FechaFacturacion,
+                        'MontoFactura' => $factura->MontoFactura,
+                        // Agregar estados de factura en formato compatible
+                        'EstadosFactura' => $estadosFacturas[$factura->NumeroFactura] ?? []
+                    ];
+                    
+                    $facturas[$factura->idComercializacion][] = $facturaCompleta;
+                }
+                
+                Log::info("🧾 Organizadas facturas para " . count($facturas) . " comercializaciones");
+            }
+            
+            // Construir estructura de datos compatible
+            $comercializacionesData = [];
+            foreach ($ventas as $venta) {
+                $comercializacion = [
+                    'idVenta' => $venta->idVenta,
+                    'idComercializacion' => $venta->idComercializacion,
+                    'CodigoCotizacion' => $venta->CodigoCotizacion,
+                    'FechaInicio' => $venta->FechaInicio,
+                    'ClienteId' => $venta->ClienteId,
+                    'NombreCliente' => $venta->NombreCliente,
+                    'ValorFinalComercializacion' => $venta->ValorFinalComercializacion,
+                    'CorreoCreador' => $venta->CorreoCreador,
+                    'estado_actual' => $venta->estado_actual,
+                    // Agregar facturas con sus estados de pago
+                    'Facturas' => $facturas[$venta->idComercializacion] ?? []
+                ];
+                
+                $comercializacionesData[] = $comercializacion;
+            }
+            
+            Log::info("✅ Estructura completa creada para " . count($comercializacionesData) . " comercializaciones con datos de pago");
+            
+            return $comercializacionesData;
+            
+        } catch (\Exception $e) {
+            Log::error("❌ Error cargando datos de BD para análisis de pagos: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * MÉTODOS HELPER PARA MANEJO DE VALORES DE PAGO
+     */
+    
+    /**
+     * Determina si una factura está pagada basándose en el valor del campo 'pagado'
+     * El campo puede contener:
+     * - String "0.00" (no pagado)
+     * - String con valor monetario "485000.00" (pagado)
+     * - Número 0 (no pagado)
+     * - Número > 0 (pagado)
+     */
+    private function esFacturaPagada($valorPagado)
+    {
+        if (is_null($valorPagado)) {
+            return false;
+        }
+        
+        // Si es string
+        if (is_string($valorPagado)) {
+            $numeroLimpio = str_replace([',', ' '], '', $valorPagado);
+            return is_numeric($numeroLimpio) && (float)$numeroLimpio > 0;
+        }
+        
+        // Si es número
+        return is_numeric($valorPagado) && $valorPagado > 0;
+    }
+    
+    /**
+     * Convierte el valor del campo 'pagado' a número
+     */
+    private function convertirPagadoANumero($valorPagado)
+    {
+        if (is_null($valorPagado)) {
+            return 0;
+        }
+        
+        // Si es string, limpiar y convertir
+        if (is_string($valorPagado)) {
+            $numeroLimpio = str_replace([',', ' '], '', $valorPagado);
+            return is_numeric($numeroLimpio) ? (float)$numeroLimpio : 0;
+        }
+        
+        // Si ya es número, retornar tal como está
+        return is_numeric($valorPagado) ? (float)$valorPagado : 0;
     }
 }

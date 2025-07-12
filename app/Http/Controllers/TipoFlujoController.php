@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 /**
@@ -47,8 +48,8 @@ class TipoFlujoController extends Controller
             Log::info("⏱️ INICIANDO ANÁLISIS TIPOS DE FLUJO");
             
             // Cargar datos del JSON
-            $jsonData = $this->cargarDatosJSON();
-            if (!$jsonData) {
+            $comercializacionesData = $this->cargarDatosBaseDatos();
+            if (!$comercializacionesData) {
                 return response()->json([
                     'success' => false,
                     'message' => 'No se pudo cargar el archivo JSON de datos'
@@ -80,7 +81,7 @@ class TipoFlujoController extends Controller
             
             $detallesComercializaciones = [];
             
-            foreach ($jsonData as $comercializacion) {
+            foreach ($comercializacionesData as $comercializacion) {
                 $comercializacionesAnalizadas++;
                 
                 // Aplicar filtros de fecha
@@ -162,7 +163,7 @@ class TipoFlujoController extends Controller
                 'metadata' => [
                     'tiempo_ejecucion_ms' => $tiempoEjecucion,
                     'timestamp' => now()->format('Y-m-d H:i:s'),
-                    'total_registros_json' => count($jsonData)
+                    'total_registros_json' => count($comercializacionesData)
                 ]
             ]);
             
@@ -188,8 +189,8 @@ class TipoFlujoController extends Controller
     public function analizarPreferenciasClientes(Request $request)
     {
         try {
-            $jsonData = $this->cargarDatosJSON();
-            if (!$jsonData) {
+            $comercializacionesData = $this->cargarDatosBaseDatos();
+            if (!$comercializacionesData) {
                 return response()->json([
                     'success' => false,
                     'message' => 'No se pudo cargar el archivo JSON de datos'
@@ -201,7 +202,7 @@ class TipoFlujoController extends Controller
             
             $clientesData = [];
             
-            foreach ($jsonData as $comercializacion) {
+            foreach ($comercializacionesData as $comercializacion) {
                 if (!$this->cumpleFiltrosFecha($comercializacion, $año, $mes)) {
                     continue;
                 }
@@ -327,8 +328,8 @@ class TipoFlujoController extends Controller
     public function analizarEficienciaPorFlujo(Request $request)
     {
         try {
-            $jsonData = $this->cargarDatosJSON();
-            if (!$jsonData) {
+            $comercializacionesData = $this->cargarDatosBaseDatos();
+            if (!$comercializacionesData) {
                 return response()->json([
                     'success' => false,
                     'message' => 'No se pudo cargar el archivo JSON de datos'
@@ -360,7 +361,7 @@ class TipoFlujoController extends Controller
                 'facturas_totales' => 0
             ];
             
-            foreach ($jsonData as $comercializacion) {
+            foreach ($comercializacionesData as $comercializacion) {
                 if (!$this->cumpleFiltrosFecha($comercializacion, $año, $mes)) {
                     continue;
                 }
@@ -423,34 +424,140 @@ class TipoFlujoController extends Controller
     // ==================================================================================
     
     /**
-     * Cargar datos del archivo JSON
+     * CARGAR DATOS DESDE BASE DE DATOS
+     * 
+     * Carga comercializaciones desde la base de datos con historial de estados
+     * para detectar tipos de flujo (con/sin SENCE)
      */
-    private function cargarDatosJSON()
+    private function cargarDatosBaseDatos($año = null, $mes = null)
     {
         try {
-            $rutasPosibles = [
-                'c:\Users\David\Downloads\datasets\8.data Oct a DIC 2024.json',
-                storage_path('app/datasets/8.data Oct a DIC 2024.json'),
-                base_path('storage/datasets/8.data Oct a DIC 2024.json')
-            ];
+            Log::info("🔍 Cargando datos desde BD para análisis de flujos - Año: " . ($año ?? 'todos') . ", Mes: " . ($mes ?? 'todos'));
             
-            foreach ($rutasPosibles as $ruta) {
-                if (file_exists($ruta)) {
-                    $contenido = file_get_contents($ruta);
-                    $datos = json_decode($contenido, true);
-                    
-                    if ($datos !== null && is_array($datos)) {
-                        Log::info("✅ JSON cargado exitosamente desde: " . $ruta);
-                        return $datos;
-                    }
-                }
+            // Query para obtener ventas con filtros de fecha
+            $queryBase = "
+                SELECT 
+                    v.idVenta,
+                    v.idComercializacion,
+                    v.CodigoCotizacion,
+                    v.FechaInicio,
+                    v.ClienteId,
+                    v.NombreCliente,
+                    v.ValorFinalComercializacion,
+                    v.CorreoCreador,
+                    v.estado_venta_id as estado_actual
+                FROM ventas v
+                WHERE 1=1
+                    -- Excluir prefijos específicos
+                    AND v.CodigoCotizacion NOT LIKE 'ADI%'
+                    AND v.CodigoCotizacion NOT LIKE 'OTR%' 
+                    AND v.CodigoCotizacion NOT LIKE 'SPD%'
+            ";
+            
+            // Aplicar filtros de fecha
+            if ($año) {
+                $queryBase .= " AND YEAR(v.FechaInicio) = {$año}";
             }
             
-            Log::error("❌ No se pudo encontrar el archivo JSON en ninguna ubicación");
-            return null;
+            if ($mes) {
+                $queryBase .= " AND MONTH(v.FechaInicio) = {$mes}";
+            }
+            
+            $queryBase .= " ORDER BY v.FechaInicio DESC";
+            
+            $ventas = DB::select($queryBase);
+            
+            Log::info("📊 Encontradas " . count($ventas) . " ventas");
+            
+            // Cargar historial de estados para todas las ventas
+            $ventasIds = array_column($ventas, 'idVenta');
+            $comercializacionesIds = array_column($ventas, 'idComercializacion');
+            
+            $historialEstados = [];
+            if (!empty($ventasIds)) {
+                $queryEstados = "
+                    SELECT 
+                        hev.venta_id,
+                        hev.idComercializacion,
+                        hev.estado_venta_id,
+                        hev.fecha,
+                        ev.nombre as nombre_estado
+                    FROM historial_estados_venta hev
+                    INNER JOIN estado_ventas ev ON hev.estado_venta_id = ev.id
+                    WHERE hev.venta_id IN (" . implode(',', $ventasIds) . ")
+                    ORDER BY hev.venta_id, hev.fecha ASC
+                ";
+                
+                $resultadosEstados = DB::select($queryEstados);
+                
+                // Organizar por venta_id
+                foreach ($resultadosEstados as $estado) {
+                    $historialEstados[$estado->venta_id][] = [
+                        'EstadoComercializacion' => $estado->estado_venta_id, // Mantener nombre compatible
+                        'Fecha' => $estado->fecha,
+                        'nombre_estado' => $estado->nombre_estado
+                    ];
+                }
+                
+                Log::info("📈 Cargados estados para " . count($historialEstados) . " ventas");
+            }
+            
+            // Cargar facturas relacionadas por idComercializacion
+            $facturas = [];
+            if (!empty($comercializacionesIds)) {
+                $queryFacturas = "
+                    SELECT 
+                        f.numero as NumeroFactura,
+                        f.FechaFacturacion,
+                        f.valor as MontoFactura,
+                        f.idComercializacion
+                    FROM facturas f
+                    WHERE f.idComercializacion IN (" . implode(',', $comercializacionesIds) . ")
+                    ORDER BY f.idComercializacion, f.FechaFacturacion ASC
+                ";
+                
+                $resultadosFacturas = DB::select($queryFacturas);
+                
+                // Organizar por idComercializacion
+                foreach ($resultadosFacturas as $factura) {
+                    $facturas[$factura->idComercializacion][] = [
+                        'NumeroFactura' => $factura->NumeroFactura,
+                        'FechaFacturacion' => $factura->FechaFacturacion,
+                        'MontoFactura' => $factura->MontoFactura
+                    ];
+                }
+                
+                Log::info("🧾 Cargadas facturas para " . count($facturas) . " comercializaciones");
+            }
+            
+            // Construir estructura de datos compatible con código existente
+            $comercializacionesData = [];
+            foreach ($ventas as $venta) {
+                $comercializacion = [
+                    'idVenta' => $venta->idVenta,
+                    'idComercializacion' => $venta->idComercializacion,
+                    'CodigoCotizacion' => $venta->CodigoCotizacion,
+                    'FechaInicio' => $venta->FechaInicio,
+                    'ClienteId' => $venta->ClienteId,
+                    'NombreCliente' => $venta->NombreCliente,
+                    'ValorFinalComercializacion' => $venta->ValorFinalComercializacion,
+                    'CorreoCreador' => $venta->CorreoCreador,
+                    'estado_actual' => $venta->estado_actual,
+                    // Agregar historial de estados (mantener nombres compatibles)
+                    'Estados' => $historialEstados[$venta->idVenta] ?? [],
+                    // Agregar facturas
+                    'Facturas' => $facturas[$venta->idComercializacion] ?? []
+                ];
+                
+                $comercializacionesData[] = $comercializacion;
+            }
+            
+            Log::info("✅ Estructura completa creada para " . count($comercializacionesData) . " comercializaciones para análisis de flujos");
+            
+            return $comercializacionesData;
             
         } catch (\Exception $e) {
-            Log::error("❌ Error cargando JSON: " . $e->getMessage());
+            Log::error("❌ Error cargando datos de BD para análisis de flujos: " . $e->getMessage());
             return null;
         }
     }
@@ -463,7 +570,7 @@ class TipoFlujoController extends Controller
         if (!$año && !$mes) return true;
         
         try {
-            $fechaInicio = Carbon::createFromFormat('d/m/Y', $comercializacion['FechaInicio']);
+            $fechaInicio = Carbon::createFromFormat('Y-m-d', $comercializacion['FechaInicio']);
             
             if ($año && $fechaInicio->year != $año) {
                 return false;
@@ -530,7 +637,7 @@ class TipoFlujoController extends Controller
         
         foreach ($comercializacion['Estados'] as $estado) {
             try {
-                $fecha = Carbon::createFromFormat('d/m/Y', $estado['Fecha']);
+                $fecha = Carbon::createFromFormat('Y-m-d', $estado['Fecha']);
                 
                 if ($estado['EstadoComercializacion'] == 0) {
                     $fechaEstado0 = $fecha;

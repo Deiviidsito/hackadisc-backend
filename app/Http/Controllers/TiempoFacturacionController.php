@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 /**
@@ -51,22 +52,23 @@ class TiempoFacturacionController extends Controller
             $startTime = microtime(true);
             Log::info("⏱️ INICIANDO CÁLCULO TIEMPO ESTADO 1 → PRIMERA FACTURA");
             
-            // Cargar datos del JSON
-            $jsonData = $this->cargarDatosJSON();
-            if (!$jsonData) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No se pudo cargar el archivo JSON de datos'
-                ], 500);
-            }
-            
             // Parámetros de filtrado
             $año = $request->input('año', null);
             $mes = $request->input('mes', null);
             $tipoFactura = $request->input('tipo_factura', 'todas'); // 'sence', 'cliente', 'todas'
             
+            // Cargar datos desde la base de datos en lugar del JSON
+            $comercializacionesData = $this->cargarDatosBaseDatos($año, $mes);
+            if (!$comercializacionesData) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudieron cargar los datos de la base de datos'
+                ], 500);
+            }
+            
             $comercializacionesAnalizadas = 0;
             $comercializacionesConFactura = 0;
+            $comercializacionesFiltradas = 0; // NUEVO: contador de registros filtrados
             $tiemposCalculados = [];
             $detallesComercializaciones = [];
             $estadisticas = [
@@ -80,13 +82,15 @@ class TiempoFacturacionController extends Controller
                 'facturas_mismo_dia' => 0  // NUEVO: facturas emitidas el mismo día del estado 1
             ];
             
-            foreach ($jsonData as $comercializacion) {
-                $comercializacionesAnalizadas++;
+            foreach ($comercializacionesData as $comercializacion) {
+                // Ya no necesitamos filtros de fecha aquí porque se aplicaron en la consulta DB
+                // if (!$this->cumpleFiltrosFecha($comercializacion, $año, $mes)) {
+                //     $comercializacionesFiltradas++;
+                //     continue;
+                // }
                 
-                // Aplicar filtros de fecha
-                if (!$this->cumpleFiltrosFecha($comercializacion, $año, $mes)) {
-                    continue;
-                }
+                // Solo contar las comercializaciones que pasan el filtro de fecha
+                $comercializacionesAnalizadas++;
                 
                 // Encontrar fecha del estado 1 (Lista para Facturar)
                 $fechaEstado1 = $this->obtenerFechaEstado1($comercializacion);
@@ -96,19 +100,19 @@ class TiempoFacturacionController extends Controller
                 }
                 
                 // Verificar si tiene facturas
-                if (!isset($comercializacion['Facturas']) || empty($comercializacion['Facturas'])) {
+                if (!isset($comercializacion['facturas']) || empty($comercializacion['facturas'])) {
                     $estadisticas['sin_facturas']++;
                     continue;
                 }
                 
                 // Obtener primera factura cronológicamente
-                $primeraFactura = $this->obtenerPrimeraFacturaCronologica($comercializacion['Facturas'], $tipoFactura, $comercializacion);
+                $primeraFactura = $this->obtenerPrimeraFacturaCronologica($comercializacion['facturas'], $tipoFactura, $comercializacion);
                 if (!$primeraFactura) {
                     continue;
                 }
                 
                 // Calcular tiempo entre estado 1 y primera factura
-                $fechaFacturacion = Carbon::createFromFormat('d/m/Y', $primeraFactura['FechaFacturacion']);
+                $fechaFacturacion = Carbon::createFromFormat('Y-m-d', $primeraFactura['FechaFacturacion']);
                 $diasDiferencia = $fechaEstado1->diffInDays($fechaFacturacion, false); // false para permitir valores negativos
                 
                 // Clasificar según timing de facturación
@@ -133,7 +137,7 @@ class TiempoFacturacionController extends Controller
                 $tipoFacturaDetectado = $this->detectarTipoFactura($primeraFactura, $comercializacion);
                 $estadisticas[$tipoFacturaDetectado]++;
                 
-                if (count($comercializacion['Facturas']) > 1) {
+                if (count($comercializacion['facturas']) > 1) {
                     $estadisticas['multiples_facturas']++;
                 }
                 
@@ -145,7 +149,7 @@ class TiempoFacturacionController extends Controller
                     'fecha_facturacion' => $primeraFactura['FechaFacturacion'],
                     'dias_diferencia' => $diasDiferencia,
                     'dias_diferencia_absoluta' => abs($diasDiferencia),
-                    'numero_factura' => $primeraFactura['numero'],
+                    'numero_factura' => $primeraFactura['NumeroFactura'],
                     'tipo_factura' => $tipoFacturaDetectado,
                     'tipo_timing' => $tipoTiming,
                     'valor_comercializacion' => $comercializacion['ValorFinalComercializacion'] ?? 0
@@ -163,6 +167,7 @@ class TiempoFacturacionController extends Controller
                 'datos' => [
                     'resumen' => [
                         'comercializaciones_analizadas' => $comercializacionesAnalizadas,
+                        'comercializaciones_filtradas' => $comercializacionesFiltradas, // NUEVO: mostrar filtrados
                         'comercializaciones_con_factura' => $comercializacionesConFactura,
                         'porcentaje_facturadas' => $comercializacionesConFactura > 0 ? 
                             round(($comercializacionesConFactura / $comercializacionesAnalizadas) * 100, 2) : 0,
@@ -190,7 +195,7 @@ class TiempoFacturacionController extends Controller
                 'metadata' => [
                     'tiempo_ejecucion_ms' => $tiempoEjecucion,
                     'timestamp' => now()->format('Y-m-d H:i:s'),
-                    'total_registros_json' => count($jsonData)
+                    'total_registros_bd' => count($comercializacionesData)
                 ]
             ]);
             
@@ -238,14 +243,14 @@ class TiempoFacturacionController extends Controller
                 $fechaEstado1 = $this->obtenerFechaEstado1MasReciente($comercializacion);
                 if (!$fechaEstado1) continue;
                 
-                if (!isset($comercializacion['Facturas']) || empty($comercializacion['Facturas'])) {
+                if (!isset($comercializacion['facturas']) || empty($comercializacion['facturas'])) {
                     continue;
                 }
                 
-                $primeraFactura = $this->obtenerPrimeraFactura($comercializacion['Facturas'], $tipoFactura, $comercializacion);
+                $primeraFactura = $this->obtenerPrimeraFactura($comercializacion['facturas'], $tipoFactura, $comercializacion);
                 if (!$primeraFactura) continue;
                 
-                $fechaFacturacion = Carbon::createFromFormat('d/m/Y', $primeraFactura['FechaFacturacion']);
+                $fechaFacturacion = Carbon::createFromFormat('Y-m-d', $primeraFactura['FechaFacturacion']);
                 $diasDiferencia = $fechaEstado1->diffInDays($fechaFacturacion);
                 
                 $clienteNombre = $comercializacion['NombreCliente'];
@@ -355,14 +360,14 @@ class TiempoFacturacionController extends Controller
                 $fechaEstado1 = $this->obtenerFechaEstado1MasReciente($comercializacion);
                 if (!$fechaEstado1) continue;
                 
-                if (!isset($comercializacion['Facturas']) || empty($comercializacion['Facturas'])) {
+                if (!isset($comercializacion['facturas']) || empty($comercializacion['facturas'])) {
                     continue;
                 }
                 
-                $primeraFactura = $this->obtenerPrimeraFactura($comercializacion['Facturas'], $tipoFactura, $comercializacion);
+                $primeraFactura = $this->obtenerPrimeraFactura($comercializacion['facturas'], $tipoFactura, $comercializacion);
                 if (!$primeraFactura) continue;
                 
-                $fechaFacturacion = Carbon::createFromFormat('d/m/Y', $primeraFactura['FechaFacturacion']);
+                $fechaFacturacion = Carbon::createFromFormat('Y-m-d', $primeraFactura['FechaFacturacion']);
                 $diasDiferencia = $fechaEstado1->diffInDays($fechaFacturacion);
                 
                 $tiempos[] = $diasDiferencia;
@@ -457,22 +462,31 @@ class TiempoFacturacionController extends Controller
      */
     private function cumpleFiltrosFecha($comercializacion, $año = null, $mes = null)
     {
+        // Si no se especifican filtros, incluir todos los registros
         if (!$año && !$mes) return true;
         
         // Usar FechaInicio para filtrar
         try {
-            $fechaInicio = Carbon::createFromFormat('d/m/Y', $comercializacion['FechaInicio']);
+            $fechaInicio = Carbon::createFromFormat('Y-m-d', $comercializacion['FechaInicio']);
             
+            // Log para debug temporal
+            if ($año == 2023) {
+                Log::info("🔍 Debug filtro: FechaInicio={$comercializacion['FechaInicio']}, Año parseado={$fechaInicio->year}, Año filtro={$año}");
+            }
+            
+            // Si se especifica año, debe coincidir
             if ($año && $fechaInicio->year != $año) {
                 return false;
             }
             
+            // Si se especifica mes, debe coincidir  
             if ($mes && $fechaInicio->month != $mes) {
                 return false;
             }
             
             return true;
         } catch (\Exception $e) {
+            Log::error("❌ Error parseando fecha: " . $comercializacion['FechaInicio'] . " - " . $e->getMessage());
             return false;
         }
     }
@@ -484,14 +498,16 @@ class TiempoFacturacionController extends Controller
      */
     private function obtenerFechaEstado1($comercializacion)
     {
-        if (!isset($comercializacion['Estados']) || empty($comercializacion['Estados'])) {
+        // Buscar en el historial de estados que cargamos desde la BD
+        if (!isset($comercializacion['historialEstados']) || empty($comercializacion['historialEstados'])) {
             return null;
         }
         
-        foreach ($comercializacion['Estados'] as $estado) {
-            if ($estado['EstadoComercializacion'] == 1) {
+        foreach ($comercializacion['historialEstados'] as $estado) {
+            if ($estado['estado_venta_id'] == 1) {
                 try {
-                    $fecha = Carbon::createFromFormat('d/m/Y', $estado['Fecha']);
+                    // Las fechas de la BD vienen en formato YYYY-MM-DD
+                    $fecha = Carbon::createFromFormat('Y-m-d', $estado['fecha']);
                     return $fecha;
                 } catch (\Exception $e) {
                     continue;
@@ -514,7 +530,7 @@ class TiempoFacturacionController extends Controller
             if (!isset($factura['FechaFacturacion'])) continue;
             
             try {
-                $fechaFacturacion = Carbon::createFromFormat('d/m/Y', $factura['FechaFacturacion']);
+                $fechaFacturacion = Carbon::createFromFormat('Y-m-d', $factura['FechaFacturacion']);
                 $facturasValidas[] = [
                     'factura' => $factura,
                     'fecha' => $fechaFacturacion
@@ -555,16 +571,18 @@ class TiempoFacturacionController extends Controller
      */
     private function obtenerFechaEstado1MasReciente($comercializacion)
     {
-        if (!isset($comercializacion['Estados']) || empty($comercializacion['Estados'])) {
+        // Buscar en el historial de estados que cargamos desde la BD
+        if (!isset($comercializacion['historialEstados']) || empty($comercializacion['historialEstados'])) {
             return null;
         }
         
         $fechasEstado1 = [];
         
-        foreach ($comercializacion['Estados'] as $estado) {
-            if ($estado['EstadoComercializacion'] == 1) {
+        foreach ($comercializacion['historialEstados'] as $estado) {
+            if ($estado['estado_venta_id'] == 1) {
                 try {
-                    $fecha = Carbon::createFromFormat('d/m/Y', $estado['Fecha']);
+                    // Las fechas de la BD vienen en formato YYYY-MM-DD
+                    $fecha = Carbon::createFromFormat('Y-m-d', $estado['fecha']);
                     $fechasEstado1[] = $fecha;
                 } catch (\Exception $e) {
                     continue;
@@ -591,7 +609,7 @@ class TiempoFacturacionController extends Controller
             if (!isset($factura['FechaFacturacion'])) continue;
             
             try {
-                $fechaFacturacion = Carbon::createFromFormat('d/m/Y', $factura['FechaFacturacion']);
+                $fechaFacturacion = Carbon::createFromFormat('Y-m-d', $factura['FechaFacturacion']);
                 $facturasValidas[] = [
                     'factura' => $factura,
                     'fecha' => $fechaFacturacion
@@ -635,8 +653,8 @@ class TiempoFacturacionController extends Controller
             foreach ($comercializacion['Estados'] as $estado) {
                 if ($estado['EstadoComercializacion'] == 3) {
                     try {
-                        $fechaEstado3 = Carbon::createFromFormat('d/m/Y', $estado['Fecha']);
-                        $fechaFactura = Carbon::createFromFormat('d/m/Y', $factura['FechaFacturacion']);
+                        $fechaEstado3 = Carbon::createFromFormat('Y-m-d', $estado['Fecha']);
+                        $fechaFactura = Carbon::createFromFormat('Y-m-d', $factura['FechaFacturacion']);
                         
                         // Si la factura se emite el mismo día o muy cerca del estado 3, es SENCE
                         if ($fechaFactura->diffInDays($fechaEstado3) <= 2) {
@@ -829,5 +847,145 @@ class TiempoFacturacionController extends Controller
         }, $array)) / count($array);
         
         return round(sqrt($variance), 2);
+    }
+    
+    /**
+     * CARGAR DATOS DESDE BASE DE DATOS
+     * 
+     * Carga comercializaciones desde la base de datos con filtros de fecha
+     * y convierte al formato esperado por el resto del código
+     */
+    private function cargarDatosBaseDatos($año = null, $mes = null)
+    {
+        try {
+            Log::info("🔍 Cargando datos desde BD - Año: " . ($año ?? 'todos') . ", Mes: " . ($mes ?? 'todos'));
+            
+            // Query para obtener ventas con sus estados y facturas
+            $queryBase = "
+                SELECT 
+                    v.idVenta,
+                    v.idComercializacion,
+                    v.CodigoCotizacion,
+                    v.FechaInicio,
+                    v.ClienteId,
+                    v.NombreCliente,
+                    v.ValorFinalComercializacion,
+                    v.CorreoCreador,
+                    v.estado_venta_id as estado_actual
+                FROM ventas v
+                WHERE 1=1
+                    -- Excluir prefijos específicos
+                    AND v.CodigoCotizacion NOT LIKE 'ADI%'
+                    AND v.CodigoCotizacion NOT LIKE 'OTR%' 
+                    AND v.CodigoCotizacion NOT LIKE 'SPD%'
+            ";
+            
+            // Aplicar filtros de fecha si se proporcionan
+            // CORRECCIÓN: FechaInicio está en formato YYYY-MM-DD, no DD/MM/YYYY
+            if ($año) {
+                $queryBase .= " AND YEAR(v.FechaInicio) = {$año}";
+            }
+            
+            if ($mes) {
+                $queryBase .= " AND MONTH(v.FechaInicio) = {$mes}";
+            }
+            
+            $queryBase .= " ORDER BY v.FechaInicio DESC";
+            
+            $ventas = DB::select($queryBase);
+            
+            Log::info("� Encontradas " . count($ventas) . " ventas");
+            
+            // Cargar historial de estados para todas las ventas
+            $ventasIds = array_column($ventas, 'idVenta');
+            $comercializacionesIds = array_column($ventas, 'idComercializacion');
+            
+            $historialEstados = [];
+            if (!empty($ventasIds)) {
+                $queryEstados = "
+                    SELECT 
+                        hev.venta_id,
+                        hev.idComercializacion,
+                        hev.estado_venta_id,
+                        hev.fecha,
+                        ev.nombre as nombre_estado
+                    FROM historial_estados_venta hev
+                    INNER JOIN estado_ventas ev ON hev.estado_venta_id = ev.id
+                    WHERE hev.venta_id IN (" . implode(',', $ventasIds) . ")
+                    ORDER BY hev.venta_id, hev.fecha ASC
+                ";
+                
+                $resultadosEstados = DB::select($queryEstados);
+                
+                // Organizar por venta_id
+                foreach ($resultadosEstados as $estado) {
+                    $historialEstados[$estado->venta_id][] = [
+                        'estado_venta_id' => $estado->estado_venta_id,
+                        'fecha' => $estado->fecha,
+                        'nombre_estado' => $estado->nombre_estado
+                    ];
+                }
+                
+                Log::info("📈 Cargados estados para " . count($historialEstados) . " ventas");
+            }
+            
+            // Cargar facturas relacionadas por idComercializacion
+            $facturas = [];
+            if (!empty($comercializacionesIds)) {
+                $queryFacturas = "
+                    SELECT 
+                        f.numero as NumeroFactura,
+                        f.FechaFacturacion,
+                        f.valor as MontoFactura,
+                        f.idComercializacion
+                    FROM facturas f
+                    WHERE f.idComercializacion IN (" . implode(',', $comercializacionesIds) . ")
+                    ORDER BY f.idComercializacion, f.FechaFacturacion ASC
+                ";
+                
+                $resultadosFacturas = DB::select($queryFacturas);
+                
+                // Organizar por idComercializacion
+                foreach ($resultadosFacturas as $factura) {
+                    $facturas[$factura->idComercializacion][] = [
+                        'NumeroFactura' => $factura->NumeroFactura,
+                        'FechaFacturacion' => $factura->FechaFacturacion,
+                        'MontoFactura' => $factura->MontoFactura
+                    ];
+                }
+                
+                Log::info("🧾 Cargadas facturas para " . count($facturas) . " comercializaciones");
+            }
+            
+            // Construir estructura de datos compatible con código existente
+            $comercializacionesData = [];
+            foreach ($ventas as $venta) {
+                $comercializacion = [
+                    'idVenta' => $venta->idVenta,
+                    'idComercializacion' => $venta->idComercializacion,
+                    'CodigoCotizacion' => $venta->CodigoCotizacion,
+                    'FechaInicio' => $venta->FechaInicio,
+                    'ClienteId' => $venta->ClienteId,
+                    'NombreCliente' => $venta->NombreCliente,
+                    'ValorFinalComercializacion' => $venta->ValorFinalComercializacion,
+                    'CorreoCreador' => $venta->CorreoCreador,
+                    'estado_actual' => $venta->estado_actual,
+                    // Agregar historial de estados
+                    'historialEstados' => $historialEstados[$venta->idVenta] ?? [],
+                    // Agregar facturas
+                    'facturas' => $facturas[$venta->idComercializacion] ?? []
+                ];
+                
+                $comercializacionesData[] = $comercializacion;
+            }
+            
+            Log::info("✅ Estructura completa creada para " . count($comercializacionesData) . " comercializaciones");
+            
+            return $comercializacionesData;
+            
+        } catch (\Exception $e) {
+            Log::error("❌ Error cargando datos de BD: " . $e->getMessage());
+            return null;
+        }
     }
 }

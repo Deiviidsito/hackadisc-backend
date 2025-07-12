@@ -1301,11 +1301,15 @@ class ImportController extends Controller
             // Procesar estados de la factura
             $estadosFactura = $facturaData['EstadosFactura'] ?? [];
             foreach ($estadosFactura as $estadoFactura) {
+                // Convertir valor de Pagado a booleano (si tiene valor > 0, está pagado)
+                $montoPagado = $estadoFactura['Pagado'] ?? 0;
+                $esPagado = is_numeric($montoPagado) && $montoPagado > 0 ? 1 : 0;
+                
                 $estadosFacturaParaCrear[] = [
                     'factura_numero' => $numeroFactura,
                     'estado_id' => $estadoFactura['estado'] ?? 1,
                     'fecha' => $this->convertirFecha($estadoFactura['Fecha'] ?? null),
-                    'pagado' => $estadoFactura['Pagado'] ?? 0,
+                    'pagado' => $esPagado,
                     'observacion' => $estadoFactura['Observacion'] ?? null,
                     'usuario_email' => $estadoFactura['Usuario'] ?? null,
                     'idComercializacion' => $idComercializacion,
