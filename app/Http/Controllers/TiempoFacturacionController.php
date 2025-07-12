@@ -8,30 +8,35 @@ use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 /**
- * CONTROLADOR ANÁLISIS TIEMPO VENTA TERMINADA → FACTURACIÓN
+ * CONTROLADOR ANÁLISIS TIEMPO ESTADO 1 (LISTA PARA FACTURAR) → PRIMERA FACTURA
  * 
- * Especializado en calcular tiempos desde estado 1 (Terminada) hasta primera factura emitida
+ * Especializado en calcular tiempos desde estado 1 (Lista para Facturar) hasta primera factura emitida
  * 
  * FUNCIONALIDADES PRINCIPALES:
- * - Cálculo tiempo promedio desde venta terminada hasta emisión primera factura
- * - Análisis por cliente con métricas de facturación  
+ * - Cálculo tiempo promedio desde estado 1 hasta emisión primera factura
+ * - Análisis casos donde facturan antes de estar lista (estado 1)
  * - Distribución de tiempos facturación en rangos
  * - Identificación facturas SENCE vs facturas cliente
  * - Análisis comportamiento facturación por tipo
  * 
  * LÓGICA DE CÁLCULO:
- * - Toma fecha más reciente de estado 1 (Terminada) como inicio
+ * - Encuentra fecha de estado 1 (Lista para Facturar) como punto de inicio
  * - Identifica primera factura emitida usando FechaFacturacion del JSON
- * - Calcula diferencia en días entre terminación y facturación
- * - Distingue entre facturas SENCE y facturas cliente
+ * - Calcula diferencia en días entre estado 1 y primera facturación
+ * - Detecta casos especiales donde facturan antes del estado 1
  * - Maneja casos complejos con múltiples facturas por comercialización
+ * 
+ * CASOS ESPECIALES:
+ * - Facturas emitidas ANTES del estado 1: contador separado
+ * - Comercializaciones sin estado 1: excluidas del análisis
+ * - Múltiples facturas: se toma la primera cronológicamente
  */
 class TiempoFacturacionController extends Controller
 {
     /**
-     * CALCULAR TIEMPO PROMEDIO TERMINACIÓN → FACTURACIÓN
+     * CALCULAR TIEMPO PROMEDIO ESTADO 1 → PRIMERA FACTURA
      * 
-     * Analiza tiempo desde estado 1 (más reciente) hasta primera factura
+     * Analiza tiempo desde estado 1 (Lista para Facturar) hasta primera factura
      * usando datos del JSON proporcionado
      * 
      * @param Request $request
@@ -44,7 +49,7 @@ class TiempoFacturacionController extends Controller
             ini_set('memory_limit', '1G');
             
             $startTime = microtime(true);
-            Log::info("⏱️ INICIANDO CÁLCULO TIEMPO TERMINACIÓN → FACTURACIÓN");
+            Log::info("⏱️ INICIANDO CÁLCULO TIEMPO ESTADO 1 → PRIMERA FACTURA");
             
             // Cargar datos del JSON
             $jsonData = $this->cargarDatosJSON();
@@ -69,7 +74,10 @@ class TiempoFacturacionController extends Controller
                 'facturas_cliente' => 0,
                 'sin_estado_1' => 0,
                 'sin_facturas' => 0,
-                'multiples_facturas' => 0
+                'multiples_facturas' => 0,
+                'facturas_antes_estado_1' => 0,  // NUEVO: contador de facturas emitidas antes del estado 1
+                'facturas_despues_estado_1' => 0, // NUEVO: contador de facturas emitidas después del estado 1
+                'facturas_mismo_dia' => 0  // NUEVO: facturas emitidas el mismo día del estado 1
             ];
             
             foreach ($jsonData as $comercializacion) {
@@ -80,8 +88,8 @@ class TiempoFacturacionController extends Controller
                     continue;
                 }
                 
-                // Encontrar fecha más reciente del estado 1 (Terminada)
-                $fechaEstado1 = $this->obtenerFechaEstado1MasReciente($comercializacion);
+                // Encontrar fecha del estado 1 (Lista para Facturar)
+                $fechaEstado1 = $this->obtenerFechaEstado1($comercializacion);
                 if (!$fechaEstado1) {
                     $estadisticas['sin_estado_1']++;
                     continue;
@@ -93,17 +101,32 @@ class TiempoFacturacionController extends Controller
                     continue;
                 }
                 
-                // Obtener primera factura según tipo solicitado
-                $primeraFactura = $this->obtenerPrimeraFactura($comercializacion['Facturas'], $tipoFactura, $comercializacion);
+                // Obtener primera factura cronológicamente
+                $primeraFactura = $this->obtenerPrimeraFacturaCronologica($comercializacion['Facturas'], $tipoFactura, $comercializacion);
                 if (!$primeraFactura) {
                     continue;
                 }
                 
-                // Calcular tiempo entre terminación y facturación
+                // Calcular tiempo entre estado 1 y primera factura
                 $fechaFacturacion = Carbon::createFromFormat('d/m/Y', $primeraFactura['FechaFacturacion']);
-                $diasDiferencia = $fechaEstado1->diffInDays($fechaFacturacion);
+                $diasDiferencia = $fechaEstado1->diffInDays($fechaFacturacion, false); // false para permitir valores negativos
                 
-                $tiemposCalculados[] = $diasDiferencia;
+                // Clasificar según timing de facturación
+                if ($diasDiferencia < 0) {
+                    $estadisticas['facturas_antes_estado_1']++;
+                    // Para casos negativos, guardamos el valor absoluto pero los marcamos especialmente
+                    $tiemposCalculados[] = abs($diasDiferencia);
+                    $tipoTiming = 'antes_estado_1';
+                } elseif ($diasDiferencia == 0) {
+                    $estadisticas['facturas_mismo_dia']++;
+                    $tiemposCalculados[] = $diasDiferencia;
+                    $tipoTiming = 'mismo_dia';
+                } else {
+                    $estadisticas['facturas_despues_estado_1']++;
+                    $tiemposCalculados[] = $diasDiferencia;
+                    $tipoTiming = 'despues_estado_1';
+                }
+                
                 $comercializacionesConFactura++;
                 
                 // Estadísticas por tipo de factura
@@ -118,11 +141,13 @@ class TiempoFacturacionController extends Controller
                 $detallesComercializaciones[] = [
                     'codigo_cotizacion' => $comercializacion['CodigoCotizacion'],
                     'cliente' => $comercializacion['NombreCliente'],
-                    'fecha_terminacion' => $fechaEstado1->format('d/m/Y'),
+                    'fecha_estado_1' => $fechaEstado1->format('d/m/Y'),
                     'fecha_facturacion' => $primeraFactura['FechaFacturacion'],
                     'dias_diferencia' => $diasDiferencia,
+                    'dias_diferencia_absoluta' => abs($diasDiferencia),
                     'numero_factura' => $primeraFactura['numero'],
                     'tipo_factura' => $tipoFacturaDetectado,
+                    'tipo_timing' => $tipoTiming,
                     'valor_comercializacion' => $comercializacion['ValorFinalComercializacion'] ?? 0
                 ];
             }
@@ -134,7 +159,7 @@ class TiempoFacturacionController extends Controller
             
             return response()->json([
                 'success' => true,
-                'message' => 'Análisis tiempo terminación → facturación completado exitosamente',
+                'message' => 'Análisis tiempo estado 1 → primera factura completado exitosamente',
                 'datos' => [
                     'resumen' => [
                         'comercializaciones_analizadas' => $comercializacionesAnalizadas,
@@ -149,6 +174,14 @@ class TiempoFacturacionController extends Controller
                     ],
                     'tiempo_promedio' => $resultados['tiempo_promedio'],
                     'estadisticas' => array_merge($estadisticas, $resultados['estadisticas']),
+                    'casos_especiales' => [
+                        'facturas_antes_estado_1' => $estadisticas['facturas_antes_estado_1'],
+                        'facturas_mismo_dia' => $estadisticas['facturas_mismo_dia'],
+                        'facturas_despues_estado_1' => $estadisticas['facturas_despues_estado_1'],
+                        'porcentaje_antes' => $comercializacionesConFactura > 0 ? 
+                            round(($estadisticas['facturas_antes_estado_1'] / $comercializacionesConFactura) * 100, 2) : 0,
+                        'mensaje_casos_antes' => 'Casos donde la factura se emitió antes de que la comercialización estuviera lista'
+                    ],
                     'distribucion_tiempos' => $resultados['distribucion'],
                     'casos_extremos' => $resultados['casos_extremos'],
                     'top_clientes_mas_lentos' => $resultados['top_lentos'],
@@ -162,18 +195,18 @@ class TiempoFacturacionController extends Controller
             ]);
             
         } catch (\Exception $e) {
-            Log::error("❌ ERROR CALCULANDO TIEMPO TERMINACIÓN → FACTURACIÓN: " . $e->getMessage());
+            Log::error("❌ ERROR CALCULANDO TIEMPO ESTADO 1 → PRIMERA FACTURA: " . $e->getMessage());
             Log::error("Stack trace: " . $e->getTraceAsString());
             
             return response()->json([
                 'success' => false,
-                'message' => 'Error al calcular tiempo terminación → facturación: ' . $e->getMessage()
+                'message' => 'Error al calcular tiempo estado 1 → primera factura: ' . $e->getMessage()
             ], 500);
         }
     }
     
     /**
-     * ANÁLISIS POR CLIENTE - TIEMPO TERMINACIÓN → FACTURACIÓN
+     * ANÁLISIS POR CLIENTE - TIEMPO ESTADO 1 → PRIMERA FACTURA
      * 
      * Agrupa resultados por cliente mostrando comportamiento individual
      * 
@@ -229,7 +262,7 @@ class TiempoFacturacionController extends Controller
                 }
                 
                 $clientesData[$clienteNombre]['comercializaciones']++;
-                $clientesData[$clienteNombre]['tiempos'][] = $diasDiferencia;
+                $clientesData[$clienteNombre]['tiempos'][] = abs($diasDiferencia); // Usar valor absoluto para estadísticas
                 $clientesData[$clienteNombre]['valor_total'] += $comercializacion['ValorFinalComercializacion'] ?? 0;
                 
                 $tipoFacturaDetectado = $this->detectarTipoFactura($primeraFactura, $comercializacion);
@@ -445,7 +478,80 @@ class TiempoFacturacionController extends Controller
     }
     
     /**
-     * Obtener fecha más reciente del estado 1 (Terminada)
+     * Obtener fecha del estado 1 (Lista para Facturar)
+     * A diferencia del método anterior, este busca específicamente el estado 1
+     * sin importar si hay estados posteriores
+     */
+    private function obtenerFechaEstado1($comercializacion)
+    {
+        if (!isset($comercializacion['Estados']) || empty($comercializacion['Estados'])) {
+            return null;
+        }
+        
+        foreach ($comercializacion['Estados'] as $estado) {
+            if ($estado['EstadoComercializacion'] == 1) {
+                try {
+                    $fecha = Carbon::createFromFormat('d/m/Y', $estado['Fecha']);
+                    return $fecha;
+                } catch (\Exception $e) {
+                    continue;
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Obtener primera factura cronológicamente (la más antigua)
+     * Independiente del tipo, solo busca la primera factura emitida
+     */
+    private function obtenerPrimeraFacturaCronologica($facturas, $tipoFactura = 'todas', $comercializacion = null)
+    {
+        $facturasValidas = [];
+        
+        foreach ($facturas as $factura) {
+            if (!isset($factura['FechaFacturacion'])) continue;
+            
+            try {
+                $fechaFacturacion = Carbon::createFromFormat('d/m/Y', $factura['FechaFacturacion']);
+                $facturasValidas[] = [
+                    'factura' => $factura,
+                    'fecha' => $fechaFacturacion
+                ];
+            } catch (\Exception $e) {
+                continue;
+            }
+        }
+        
+        if (empty($facturasValidas)) {
+            return null;
+        }
+        
+        // Ordenar por fecha (más antigua primero)
+        usort($facturasValidas, function($a, $b) {
+            return $a['fecha'] <=> $b['fecha'];
+        });
+        
+        // Filtrar por tipo si se especifica
+        if ($tipoFactura !== 'todas') {
+            foreach ($facturasValidas as $facturaData) {
+                $tipo = $this->detectarTipoFactura($facturaData['factura'], $comercializacion);
+                if (($tipoFactura === 'sence' && $tipo === 'facturas_sence') ||
+                    ($tipoFactura === 'cliente' && $tipo === 'facturas_cliente')) {
+                    return $facturaData['factura'];
+                }
+            }
+            return null;
+        }
+        
+        // Retornar la primera factura cronológicamente
+        return $facturasValidas[0]['factura'];
+    }
+    
+    /**
+     * Obtener fecha más reciente del estado 1 (Terminada) - MÉTODO LEGACY
+     * Mantenido para compatibilidad con otros métodos que aún lo usen
      */
     private function obtenerFechaEstado1MasReciente($comercializacion)
     {
