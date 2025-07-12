@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\VentasTotalesController;
 use App\Http\Controllers\PagoInicioVentaController;
+use App\Http\Controllers\ConsultarFiabilidadCliente;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\TiempoEtapasController;
@@ -55,6 +56,16 @@ Route::get('ventas/resumen-anual', [VentasTotalesController::class, 'resumenVent
 // - Estadísticas: mediana, mínimo, máximo de días
 // - Interpretación del análisis para mejor comprensión
 Route::post('pagos/analizar-tiempo-completo', [PagoInicioVentaController::class, 'analizarTiempoPagoCompleto']);
+
+// POST /api/clientes/consultar-fiabilidad - ANÁLISIS DE FIABILIDAD DEL CLIENTE
+// 🎯 CARACTERÍSTICAS:
+// - Análisis específico de patrones de pago por cliente individual
+// - Predicción de pagos pendientes basado en comportamiento histórico
+// - Estadísticas personalizadas: promedio, mediana, desviación estándar
+// - Validación de pagos parciales (estadoFactura = 4)
+// - Estimación de fechas de pago para facturas pendientes
+// Body: {"nombre_cliente": "Nombre del Cliente", "anio": 2024}
+Route::post('clientes/consultar-fiabilidad', [ConsultarFiabilidadCliente::class, 'analizarFiabilidadCliente']);
 // ==================== RUTAS DE ANÁLISIS TIEMPO ENTRE ETAPAS ====================
 
 // POST /api/tiempo-etapas/promedio - ANÁLISIS TIEMPO PROMEDIO ENTRE ETAPAS
