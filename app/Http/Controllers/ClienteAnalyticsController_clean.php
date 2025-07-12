@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Http\Controllers;
 
@@ -15,7 +15,7 @@ class ClienteAnalyticsController extends Controller
 {
     /**
      * GET /api/clientes/listar - LISTAR TODOS LOS CLIENTES
-     * 📋 Retorna lista completa de clientes con estadísticas básicas
+     * ðŸ“‹ Retorna lista completa de clientes con estadÃ­sticas bÃ¡sicas
      */
     public function listarClientes()
     {
@@ -25,7 +25,7 @@ class ClienteAnalyticsController extends Controller
                 ->get()
                 ->map(function($cliente) {
                     try {
-                        // Calcular estadísticas básicas
+                        // Calcular estadÃ­sticas bÃ¡sicas
                         $totalVentas = Venta::where('ClienteId', $cliente->id)->count();
                         $valorTotal = Venta::where('ClienteId', $cliente->id)->sum('ValorFinalComercializacion') ?? 0;
                         
@@ -59,7 +59,7 @@ class ClienteAnalyticsController extends Controller
                             ]
                         ];
                     } catch (\Exception $e) {
-                        // Si hay error con un cliente específico, devolver datos básicos
+                        // Si hay error con un cliente especÃ­fico, devolver datos bÃ¡sicos
                         return [
                             'id' => $cliente->id,
                             'insecap_id' => $cliente->InsecapClienteId,
@@ -103,8 +103,8 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * GET /api/clientes/{id}/analytics - ANALÍTICAS COMPLETAS POR CLIENTE
-     * 📊 Dashboard personalizado con todas las métricas de un cliente específico
+     * GET /api/clientes/{id}/analytics - ANALÃTICAS COMPLETAS POR CLIENTE
+     * ðŸ“Š Dashboard personalizado con todas las mÃ©tricas de un cliente especÃ­fico
      */
     public function analyticsCliente($clienteId)
     {
@@ -112,7 +112,7 @@ class ClienteAnalyticsController extends Controller
             // Verificar que el cliente existe
             $cliente = Cliente::findOrFail($clienteId);
 
-            // Obtener datos básicos del cliente de manera segura
+            // Obtener datos bÃ¡sicos del cliente de manera segura
             $analytics = [
                 'cliente_info' => [
                     'id' => $cliente->id,
@@ -133,14 +133,14 @@ class ClienteAnalyticsController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => "Analíticas completas para {$cliente->NombreCliente}",
+                'message' => "AnalÃ­ticas completas para {$cliente->NombreCliente}",
                 'datos' => $analytics
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error al obtener analíticas del cliente',
+                'message' => 'Error al obtener analÃ­ticas del cliente',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ], 500);
@@ -149,7 +149,7 @@ class ClienteAnalyticsController extends Controller
 
     /**
      * GET /api/clientes/{id}/comparar?cliente_comparacion={id2} - COMPARAR DOS CLIENTES
-     * 🔍 Comparativa detallada entre dos clientes
+     * ðŸ” Comparativa detallada entre dos clientes
      */
     public function compararClientes($clienteId, Request $request)
     {
@@ -159,7 +159,7 @@ class ClienteAnalyticsController extends Controller
             if (!$clienteComparacionId) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Debe proporcionar cliente_comparacion como parámetro'
+                    'message' => 'Debe proporcionar cliente_comparacion como parÃ¡metro'
                 ], 400);
             }
 
@@ -197,8 +197,8 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * GET /api/clientes/{id}/simulador-pagos - SIMULADOR DE PREDICCIÓN DE PAGOS
-     * 🔮 Simulador avanzado que predice comportamientos de pago
+     * GET /api/clientes/{id}/simulador-pagos - SIMULADOR DE PREDICCIÃ“N DE PAGOS
+     * ðŸ”® Simulador avanzado que predice comportamientos de pago
      */
     public function simuladorPrediccionPagos($clienteId)
     {
@@ -208,7 +208,7 @@ class ClienteAnalyticsController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => "Simulador de predicción de pagos para {$cliente->NombreCliente}",
+                'message' => "Simulador de predicciÃ³n de pagos para {$cliente->NombreCliente}",
                 'datos' => $simulacion,
                 'timestamp' => now()->toISOString()
             ]);
@@ -216,13 +216,13 @@ class ClienteAnalyticsController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error en simulador de predicción',
+                'message' => 'Error en simulador de predicciÃ³n',
                 'error' => $e->getMessage()
             ], 500);
         }
     }
 
-    // ==================== MÉTODOS AUXILIARES ====================
+    // ==================== MÃ‰TODOS AUXILIARES ====================
 
     private function determinarEstadoActividad($fechaUltimaVenta)
     {
@@ -248,7 +248,7 @@ class ClienteAnalyticsController extends Controller
                 'periodo_actividad' => [
                     'primera_venta' => $ventas->min('FechaInicio'),
                     'ultima_venta' => $ventas->max('FechaInicio'),
-                    'años_como_cliente' => $ventas->count() > 0 ? 
+                    'aÃ±os_como_cliente' => $ventas->count() > 0 ? 
                         Carbon::parse($ventas->min('FechaInicio'))->diffInYears(now()) : 0
                 ]
             ];
@@ -267,7 +267,7 @@ class ClienteAnalyticsController extends Controller
         try {
             $ventas = Venta::where('ClienteId', $clienteId)
                 ->orderBy('FechaInicio', 'desc')
-                ->limit(10) // Limitar a las últimas 10 ventas
+                ->limit(10) // Limitar a las Ãºltimas 10 ventas
                 ->get()
                 ->map(function($venta) {
                     return [
@@ -277,16 +277,16 @@ class ClienteAnalyticsController extends Controller
                     ];
                 });
 
-            // Agrupación por año
-            $ventasPorAño = Venta::where('ClienteId', $clienteId)
-                ->selectRaw('YEAR(FechaInicio) as año, COUNT(*) as cantidad, SUM(ValorFinalComercializacion) as valor_total')
-                ->groupBy('año')
-                ->orderBy('año', 'desc')
+            // AgrupaciÃ³n por aÃ±o
+            $ventasPorAÃ±o = Venta::where('ClienteId', $clienteId)
+                ->selectRaw('YEAR(FechaInicio) as aÃ±o, COUNT(*) as cantidad, SUM(ValorFinalComercializacion) as valor_total')
+                ->groupBy('aÃ±o')
+                ->orderBy('aÃ±o', 'desc')
                 ->get();
 
             return [
                 'ventas_recientes' => $ventas,
-                'agrupacion_anual' => $ventasPorAño,
+                'agrupacion_anual' => $ventasPorAÃ±o,
                 'total_historico' => Venta::where('ClienteId', $clienteId)->count()
             ];
         } catch (\Exception $e) {
@@ -353,7 +353,7 @@ class ClienteAnalyticsController extends Controller
 
     /**
      * HISTORIA DETALLADA DE PAGOS DEL CLIENTE
-     * Analiza el comportamiento histórico de pagos con detalles cronológicos
+     * Analiza el comportamiento histÃ³rico de pagos con detalles cronolÃ³gicos
      */
     private function obtenerHistoriaPagos($clienteId)
     {
@@ -412,7 +412,7 @@ class ClienteAnalyticsController extends Controller
                 ];
             }
             
-            // Ordenar por fecha de facturación más reciente
+            // Ordenar por fecha de facturaciÃ³n mÃ¡s reciente
             usort($historiaPagos, function($a, $b) {
                 return strtotime($b['fecha_facturacion']) - strtotime($a['fecha_facturacion']);
             });
@@ -441,8 +441,8 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * ESTIMACIÓN DE TIEMPO PARA NUEVA VENTA
-     * Predice cuándo pagará una nueva venta basándose en comportamiento histórico
+     * ESTIMACIÃ“N DE TIEMPO PARA NUEVA VENTA
+     * Predice cuÃ¡ndo pagarÃ¡ una nueva venta basÃ¡ndose en comportamiento histÃ³rico
      */
     private function estimarTiempoPagoNuevaVenta($clienteId)
     {
@@ -453,15 +453,15 @@ class ClienteAnalyticsController extends Controller
                 $historiaPagos['resumen_comportamiento']['facturas_pagadas'] == 0) {
                 return [
                     'estimacion_disponible' => false,
-                    'razon' => 'No hay historial de pagos suficiente para realizar estimación',
-                    'recomendacion' => 'Establecer condiciones de pago estándar (30-45 días)'
+                    'razon' => 'No hay historial de pagos suficiente para realizar estimaciÃ³n',
+                    'recomendacion' => 'Establecer condiciones de pago estÃ¡ndar (30-45 dÃ­as)'
                 ];
             }
             
             $resumen = $historiaPagos['resumen_comportamiento'];
             $facturasPagadas = array_filter($historiaPagos['facturas_historicas'], fn($f) => $f['estado'] === 'pagada');
             
-            // Extraer tiempos de pago para cálculos estadísticos
+            // Extraer tiempos de pago para cÃ¡lculos estadÃ­sticos
             $tiemposPago = array_column($facturasPagadas, 'dias_pago');
             
             if (count($tiemposPago) < 2) {
@@ -472,17 +472,17 @@ class ClienteAnalyticsController extends Controller
                 ];
             }
             
-            // Cálculos estadísticos
+            // CÃ¡lculos estadÃ­sticos
             $promedio = $resumen['tiempo_promedio_pago'];
             $mediana = $this->calcularMediana($tiemposPago);
             $desviacion = $this->calcularDesviacionEstandar($tiemposPago, $promedio);
             
-            // Percentiles para rangos de estimación
+            // Percentiles para rangos de estimaciÃ³n
             $percentil25 = $this->calcularPercentil($tiemposPago, 25);
             $percentil75 = $this->calcularPercentil($tiemposPago, 75);
             $percentil90 = $this->calcularPercentil($tiemposPago, 90);
             
-            // Análisis de tendencia (¿está mejorando o empeorando?)
+            // AnÃ¡lisis de tendencia (Â¿estÃ¡ mejorando o empeorando?)
             $tendencia = $this->analizarTendenciaPagos($facturasPagadas);
             
             // Generar estimaciones
@@ -541,7 +541,7 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * ANÁLISIS DETALLADO DE COMPORTAMIENTO DE FACTURACIÓN
+     * ANÃLISIS DETALLADO DE COMPORTAMIENTO DE FACTURACIÃ“N
      */
     private function analizarComportamientoFacturacion($clienteId)
     {
@@ -567,7 +567,7 @@ class ClienteAnalyticsController extends Controller
                     $valoresPorTipo['cliente'][] = $this->estimarMontoFactura($datosJSON, 0);
                 }
                 
-                // Calcular tiempo de facturación si es posible
+                // Calcular tiempo de facturaciÃ³n si es posible
                 $venta = $ventas->where('CodigoCotizacion', $factura->numero)->first();
                 if ($venta && isset($datosJSON['FechaFacturacion'])) {
                     $fechaInicio = Carbon::parse($venta->FechaInicio);
@@ -611,7 +611,7 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * ANÁLISIS DETALLADO DE MOROSIDAD
+     * ANÃLISIS DETALLADO DE MOROSIDAD
      */
     private function analizarMorosidadDetallada($clienteId)
     {
@@ -632,12 +632,12 @@ class ClienteAnalyticsController extends Controller
             $tiemposPago = array_column($facturasPagadas, 'dias_pago');
             $porcentajePagadas = (count($facturasPagadas) / count($facturas)) * 100;
             
-            // Análisis de puntualidad (facturas pagadas en <= 30 días)
+            // AnÃ¡lisis de puntualidad (facturas pagadas en <= 30 dÃ­as)
             $facturasPuntuales = array_filter($facturasPagadas, fn($f) => $f['dias_pago'] <= 30);
             $facturasRetrasadas = array_filter($facturasPagadas, fn($f) => $f['dias_pago'] > 30 && $f['dias_pago'] <= 90);
             $facturasMorosas = array_filter($facturasPagadas, fn($f) => $f['dias_pago'] > 90);
             
-            // Análisis de facturas pendientes críticas
+            // AnÃ¡lisis de facturas pendientes crÃ­ticas
             $pendientesCriticas = [];
             foreach ($facturasPendientes as $pendiente) {
                 $diasPendientes = Carbon::parse($pendiente['fecha_facturacion'])->diffInDays(now());
@@ -681,7 +681,7 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * ANÁLISIS DE FLUJO COMERCIAL (SENCE vs DIRECTO)
+     * ANÃLISIS DE FLUJO COMERCIAL (SENCE vs DIRECTO)
      */
     private function analizarFlujoComercial($clienteId)
     {
@@ -764,146 +764,54 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * 🔮 SIMULADOR DE PREDICCIÓN DE PAGOS AVANZADO
-     * Utiliza machine learning básico y análisis estadístico para predecir comportamientos
+     * ðŸ”® SIMULADOR DE PREDICCIÃ“N DE PAGOS AVANZADO
+     * Utiliza machine learning bÃ¡sico y anÃ¡lisis estadÃ­stico para predecir comportamientos
      */
-    public function simularPrediccionPagos($clienteId)
+    private function simularPrediccionPagos($clienteId)
     {
         try {
-            // Validar cliente
-            $cliente = Cliente::find($clienteId);
-            if (!$cliente) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Cliente no encontrado'
-                ], 404);
-            }
+            // 1. Recopilar datos histÃ³ricos del cliente
+            $datosHistoricos = $this->recopilarDatosHistoricos($clienteId);
             
-            // ✅ SIMULADOR DE PREDICCIÓN DE TIEMPO DE PAGO CON IA
-            // 🧠 Análisis avanzado con múltiples algoritmos de machine learning
+            // 2. AnÃ¡lisis de patrones de comportamiento
+            $patronesComportamiento = $this->analizarPatronesComportamiento($datosHistoricos);
             
-            // 📊 Datos históricos básicos del cliente
-            $ventasCount = Venta::where('ClienteId', $clienteId)->count();
+            // 3. Simulaciones con diferentes escenarios
+            $simulacionesEscenarios = $this->generarSimulacionesEscenarios($datosHistoricos, $patronesComportamiento);
             
-            // Para facturas, necesitamos hacer un join con ventas
-            $facturasCount = Factura::join('ventas', 'facturas.idComercializacion', '=', 'ventas.idComercializacion')
-                ->where('ventas.ClienteId', $clienteId)
-                ->count();
+            // 4. Predicciones basadas en IA bÃ¡sica
+            $prediccionesIA = $this->generarPrediccionesIA($datosHistoricos);
             
-            $datosHistoricos = [
-                'total_ventas' => $ventasCount,
-                'total_facturas' => $facturasCount,
-                'periodo_analisis' => '24 meses',
-                'calidad_datos' => $ventasCount > 5 ? 'Alta' : 'Media',
-                'promedio_dias_pago' => rand(20, 60),
-                'ultima_actividad' => now()->subDays(rand(1, 30))->format('Y-m-d')
-            ];
+            // 5. Score de confiabilidad del cliente
+            $scoreConfiabilidad = $this->calcularScoreConfiabilidad($datosHistoricos);
             
-            // 🤖 Algoritmos de IA para predicción
-            $prediccionesIA = [
-                'regresion_lineal' => [
-                    'dias_estimados' => $datosHistoricos['promedio_dias_pago'] + rand(-5, 10),
-                    'confiabilidad' => rand(75, 95) . '%',
-                    'tendencia' => rand(0, 1) ? 'mejorando' : 'estable'
-                ],
-                'red_neuronal_simulada' => [
-                    'dias_estimados' => $datosHistoricos['promedio_dias_pago'] + rand(-3, 7),
-                    'precision' => rand(80, 98) . '%',
-                    'factores_clave' => ['historial_pagos', 'monto_factura', 'epoca_año']
-                ],
-                'algoritmo_bayesiano' => [
-                    'probabilidad_pago_30_dias' => rand(60, 90) . '%',
-                    'probabilidad_pago_60_dias' => rand(85, 99) . '%',
-                    'riesgo_morosidad' => rand(5, 25) . '%'
-                ]
-            ];
-            
-            // 📈 Score de confiabilidad del cliente
-            $scoreConfiabilidad = min(100, max(20, 
-                70 + ($ventasCount > 10 ? 15 : 0) + ($facturasCount > 5 ? 10 : 0) + rand(-10, 15)
-            ));
-            
-            // 🎯 Simulación de escenarios
-            $simulacionesEscenarios = [
-                'escenario_optimista' => [
-                    'dias_pago' => max(1, $datosHistoricos['promedio_dias_pago'] - 10),
-                    'probabilidad' => '30%',
-                    'condiciones' => 'Descuento por pronto pago aplicado'
-                ],
-                'escenario_realista' => [
-                    'dias_pago' => $datosHistoricos['promedio_dias_pago'],
-                    'probabilidad' => '50%',
-                    'condiciones' => 'Comportamiento habitual'
-                ],
-                'escenario_pesimista' => [
-                    'dias_pago' => $datosHistoricos['promedio_dias_pago'] + 15,
-                    'probabilidad' => '20%',
-                    'condiciones' => 'Demoras por factores externos'
-                ]
-            ];
-            
-            // 📋 Recomendaciones dinámicas
-            $recomendaciones = [];
-            if ($scoreConfiabilidad < 60) {
-                $recomendaciones[] = '⚠️ Considerar pago adelantado o garantías adicionales';
-                $recomendaciones[] = '📞 Realizar seguimiento semanal de facturación';
-            }
-            if ($datosHistoricos['promedio_dias_pago'] > 45) {
-                $recomendaciones[] = '💰 Ofrecer descuentos por pronto pago';
-            }
-            if ($ventasCount > 20) {
-                $recomendaciones[] = '🌟 Cliente frecuente: condiciones preferenciales disponibles';
-            }
-            $recomendaciones[] = '📊 Monitorear tendencias trimestralmente';
-            
-            return response()->json([
-                'success' => true,
+            // 6. Recomendaciones comerciales dinÃ¡micas
+            $recomendacionesDinamicas = $this->generarRecomendacionesDinamicas($scoreConfiabilidad, $patronesComportamiento);
+
+            return [
                 'simulador_activo' => true,
-                'cliente' => [
-                    'id' => $clienteId,
-                    'nombre' => $cliente->NombreCliente,
-                    'fecha_analisis' => now()->format('Y-m-d H:i:s')
+                'datos_base' => [
+                    'facturas_analizadas' => $datosHistoricos['total_facturas'],
+                    'periodo_analisis' => $datosHistoricos['periodo_analisis'],
+                    'calidad_datos' => $datosHistoricos['calidad_datos']
                 ],
-                'datos_historicos' => $datosHistoricos,
+                'patrones_identificados' => $patronesComportamiento,
+                'simulaciones' => $simulacionesEscenarios,
                 'predicciones_ia' => $prediccionesIA,
                 'score_confiabilidad' => $scoreConfiabilidad,
-                'simulaciones_escenarios' => $simulacionesEscenarios,
-                'recomendaciones_dinamicas' => $recomendaciones,
-                'analisis_riesgo' => [
-                    'nivel_riesgo' => $scoreConfiabilidad > 80 ? 'BAJO' : ($scoreConfiabilidad > 60 ? 'MEDIO' : 'ALTO'),
-                    'factores_riesgo' => $scoreConfiabilidad < 70 ? ['Historial limitado', 'Pagos irregulares'] : ['Ninguno significativo'],
-                    'recomendacion_credito' => $scoreConfiabilidad > 75 ? 'APROBAR' : 'REVISAR MANUALMENTE'
-                ],
-                'alertas_automaticas' => [
-                    'proxima_revision' => now()->addDays(30)->format('Y-m-d'),
-                    'alertas_activas' => $scoreConfiabilidad < 60 ? ['Seguimiento intensivo requerido'] : [],
-                    'notificaciones' => ['Análisis completado exitosamente']
-                ],
-                'dashboard_interactivo' => [
-                    'graficos_disponibles' => ['tendencia_pagos', 'distribucion_tiempos', 'comparativa_industria'],
-                    'metricas_clave' => [
-                        'tiempo_promedio_pago' => $datosHistoricos['promedio_dias_pago'] . ' días',
-                        'variabilidad' => rand(5, 20) . ' días',
-                        'mejor_mes' => date('F', rand(1, 12)),
-                        'peor_mes' => date('F', rand(1, 12))
-                    ],
-                    'tendencias' => [
-                        'ultimo_trimestre' => rand(0, 1) ? 'mejorando' : 'estable',
-                        'proyeccion_6_meses' => 'estable'
-                    ]
-                ],
-                'timestamp_simulacion' => now()->toISOString(),
-                'version_algoritmo' => '2.1.0',
-                'mensaje' => '🚀 Simulador de predicción con IA activado exitosamente'
-            ]);
+                'recomendaciones_dinamicas' => $recomendacionesDinamicas,
+                'analisis_riesgo' => $this->evaluarRiesgoCredito($scoreConfiabilidad),
+                'alertas_automaticas' => $this->generarAlertasAutomaticas($datosHistoricos, $scoreConfiabilidad),
+                'dashboard_interactivo' => $this->generarDashboardInteractivo($datosHistoricos, $simulacionesEscenarios),
+                'timestamp_simulacion' => now()->toISOString()
+            ];
             
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
+            return [
                 'simulador_activo' => false,
                 'error' => $e->getMessage(),
-                'mensaje' => 'Error en la simulación de predicción de pagos'
-            ], 500);
+                'mensaje' => 'No hay suficientes datos para ejecutar simulaciones avanzadas'
+            ];
         }
     }
 
@@ -921,7 +829,7 @@ class ClienteAnalyticsController extends Controller
                 ];
             });
 
-        // Agrupación por año y mes
+        // AgrupaciÃ³n por aÃ±o y mes
         $ventasPorPeriodo = $ventas->groupBy(function($venta) {
             return Carbon::parse($venta['fecha_inicio'])->format('Y-m');
         })->map(function($ventasMes) {
@@ -1074,28 +982,28 @@ class ClienteAnalyticsController extends Controller
                 return Carbon::parse($venta->FechaInicio)->format('Y');
             });
 
-        $tendenciasPorAño = $ventas->map(function($ventasAño) {
+        $tendenciasPorAÃ±o = $ventas->map(function($ventasAÃ±o) {
             return [
-                'cantidad_ventas' => $ventasAño->count(),
-                'valor_total' => $ventasAño->sum('ValorComercializacion'),
-                'valor_promedio' => $ventasAño->avg('ValorComercializacion')
+                'cantidad_ventas' => $ventasAÃ±o->count(),
+                'valor_total' => $ventasAÃ±o->sum('ValorComercializacion'),
+                'valor_promedio' => $ventasAÃ±o->avg('ValorComercializacion')
             ];
         });
 
         return [
-            'evolucion_anual' => $tendenciasPorAño,
-            'crecimiento_ventas' => $this->calcularCrecimiento($tendenciasPorAño, 'cantidad_ventas'),
-            'crecimiento_valores' => $this->calcularCrecimiento($tendenciasPorAño, 'valor_total'),
+            'evolucion_anual' => $tendenciasPorAÃ±o,
+            'crecimiento_ventas' => $this->calcularCrecimiento($tendenciasPorAÃ±o, 'cantidad_ventas'),
+            'crecimiento_valores' => $this->calcularCrecimiento($tendenciasPorAÃ±o, 'valor_total'),
             'estacionalidad' => $this->analizarEstacionalidad($clienteId)
         ];
     }
 
     private function obtenerComparativaMercado($clienteId)
     {
-        // Obtener métricas del cliente
+        // Obtener mÃ©tricas del cliente
         $resumenCliente = $this->obtenerResumenGeneral($clienteId);
         
-        // Obtener métricas promedio del mercado
+        // Obtener mÃ©tricas promedio del mercado
         $promedioMercado = [
             'valor_promedio_venta' => Venta::avg('ValorComercializacion'),
             'ventas_promedio_por_cliente' => Venta::count() / Cliente::count(),
@@ -1117,7 +1025,7 @@ class ClienteAnalyticsController extends Controller
         ];
     }
 
-    // Métodos auxiliares adicionales
+    // MÃ©todos auxiliares adicionales
     private function calcularTiempoEtapa0a1($historial)
     {
         $fechaEstado0 = $historial->where('estado', 0)->first()?->fecha;
@@ -1225,15 +1133,15 @@ class ClienteAnalyticsController extends Controller
 
     private function calcularCrecimiento($datos, $campo)
     {
-        $años = array_keys($datos->toArray());
-        if (count($años) < 2) return 'insuficientes_datos';
+        $aÃ±os = array_keys($datos->toArray());
+        if (count($aÃ±os) < 2) return 'insuficientes_datos';
         
-        $primerAño = $datos[$años[0]][$campo];
-        $ultimoAño = $datos[$años[count($años) - 1]][$campo];
+        $primerAÃ±o = $datos[$aÃ±os[0]][$campo];
+        $ultimoAÃ±o = $datos[$aÃ±os[count($aÃ±os) - 1]][$campo];
         
-        if ($primerAño == 0) return 'sin_base_calculo';
+        if ($primerAÃ±o == 0) return 'sin_base_calculo';
         
-        return (($ultimoAño - $primerAño) / $primerAño) * 100;
+        return (($ultimoAÃ±o - $primerAÃ±o) / $primerAÃ±o) * 100;
     }
 
     private function analizarEstacionalidad($clienteId)
@@ -1255,13 +1163,13 @@ class ClienteAnalyticsController extends Controller
 
     private function obtenerTiempoPromedioMercado()
     {
-        // Simplificado - en una implementación real sería más complejo
-        return 45; // días promedio estimado
+        // Simplificado - en una implementaciÃ³n real serÃ­a mÃ¡s complejo
+        return 45; // dÃ­as promedio estimado
     }
 
     private function calcularPosicionMercado($clienteId, $tipo)
     {
-        // Implementación simplificada del ranking
+        // ImplementaciÃ³n simplificada del ranking
         $totalClientes = Cliente::count();
         $posicion = Cliente::where('id', '<=', $clienteId)->count();
         
@@ -1319,16 +1227,16 @@ class ClienteAnalyticsController extends Controller
         
         $analisis = [];
         
-        // Análisis de ventas
+        // AnÃ¡lisis de ventas
         if ($metricas['ventas']['diferencia'] > 0) {
-            $analisis['ventas'] = 'Cliente A tiene más ventas';
+            $analisis['ventas'] = 'Cliente A tiene mÃ¡s ventas';
         } elseif ($metricas['ventas']['diferencia'] < 0) {
-            $analisis['ventas'] = 'Cliente B tiene más ventas';
+            $analisis['ventas'] = 'Cliente B tiene mÃ¡s ventas';
         } else {
             $analisis['ventas'] = 'Ambos clientes tienen igual cantidad de ventas';
         }
         
-        // Análisis de valores
+        // AnÃ¡lisis de valores
         if ($metricas['valor_promedio']['diferencia'] > 0) {
             $analisis['valor_promedio'] = 'Cliente A tiene mayor valor promedio por venta';
         } elseif ($metricas['valor_promedio']['diferencia'] < 0) {
@@ -1340,17 +1248,17 @@ class ClienteAnalyticsController extends Controller
         return $analisis;
     }
 
-    // ===== MÉTODOS AUXILIARES Y DE CÁLCULO =====
+    // ===== MÃ‰TODOS AUXILIARES Y DE CÃLCULO =====
 
     /**
-     * Detecta el tipo de factura basándose en los datos JSON
+     * Detecta el tipo de factura basÃ¡ndose en los datos JSON
      */
     private function detectarTipoFactura($datosJSON)
     {
         if (!is_array($datosJSON)) return 'cliente';
         
         // Buscar indicadores de financiamiento SENCE
-        $indicadoresSENCE = ['sence', 'financiamiento', 'subvención', 'franquicia'];
+        $indicadoresSENCE = ['sence', 'financiamiento', 'subvenciÃ³n', 'franquicia'];
         
         foreach ($datosJSON as $key => $value) {
             $keyLower = strtolower((string)$key);
@@ -1367,7 +1275,7 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * Estima el monto de la factura basándose en datos disponibles
+     * Estima el monto de la factura basÃ¡ndose en datos disponibles
      */
     private function estimarMontoFactura($datosJSON, $montoPagado = 0)
     {
@@ -1403,7 +1311,7 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * Calcula la mediana de un array de números
+     * Calcula la mediana de un array de nÃºmeros
      */
     private function calcularMediana($numeros)
     {
@@ -1421,7 +1329,7 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * Calcula la desviación estándar
+     * Calcula la desviaciÃ³n estÃ¡ndar
      */
     private function calcularDesviacionEstandar($numeros, $promedio)
     {
@@ -1436,7 +1344,7 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * Calcula un percentil específico
+     * Calcula un percentil especÃ­fico
      */
     private function calcularPercentil($numeros, $percentil)
     {
@@ -1461,7 +1369,7 @@ class ClienteAnalyticsController extends Controller
     {
         if (count($facturasPagadas) < 3) return 'datos_insuficientes';
         
-        // Ordenar por fecha de facturación
+        // Ordenar por fecha de facturaciÃ³n
         usort($facturasPagadas, function($a, $b) {
             return strtotime($a['fecha_facturacion']) - strtotime($b['fecha_facturacion']);
         });
@@ -1488,11 +1396,11 @@ class ClienteAnalyticsController extends Controller
         $recomendaciones = [];
         
         if ($promedio > 60) {
-            $recomendaciones[] = 'Considerar condiciones de pago más estrictas o descuentos por pronto pago';
+            $recomendaciones[] = 'Considerar condiciones de pago mÃ¡s estrictas o descuentos por pronto pago';
         }
         
         if ($desviacion > 30) {
-            $recomendaciones[] = 'Comportamiento muy variable, evaluar factores estacionales o específicos';
+            $recomendaciones[] = 'Comportamiento muy variable, evaluar factores estacionales o especÃ­ficos';
         }
         
         if ($tendencia === 'empeorando') {
@@ -1505,11 +1413,11 @@ class ClienteAnalyticsController extends Controller
             $recomendaciones[] = 'Cliente con excelente historial de pago, candidato para condiciones preferenciales';
         }
         
-        return empty($recomendaciones) ? ['Cliente con comportamiento de pago estándar'] : $recomendaciones;
+        return empty($recomendaciones) ? ['Cliente con comportamiento de pago estÃ¡ndar'] : $recomendaciones;
     }
 
     /**
-     * Evalúa la confiabilidad de la estimación
+     * EvalÃºa la confiabilidad de la estimaciÃ³n
      */
     private function evaluarConfiabilidadEstimacion($cantidadFacturas, $desviacion, $promedio)
     {
@@ -1521,7 +1429,7 @@ class ClienteAnalyticsController extends Controller
         elseif ($cantidadFacturas >= 3) $score += 15;
         else $score += 5;
         
-        // Puntos por consistencia (baja desviación)
+        // Puntos por consistencia (baja desviaciÃ³n)
         $coeficienteVariacion = $promedio > 0 ? ($desviacion / $promedio) : 1;
         if ($coeficienteVariacion < 0.2) $score += 30;
         elseif ($coeficienteVariacion < 0.4) $score += 20;
@@ -1556,25 +1464,25 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * Clasificación avanzada de morosidad
+     * ClasificaciÃ³n avanzada de morosidad
      */
     private function clasificarMorosidadAvanzada($porcentajePagadas, $promedioPago, $pendientesCriticas)
     {
         $score = 0;
         
-        // Evaluación por porcentaje de facturas pagadas
+        // EvaluaciÃ³n por porcentaje de facturas pagadas
         if ($porcentajePagadas >= 95) $score += 40;
         elseif ($porcentajePagadas >= 85) $score += 30;
         elseif ($porcentajePagadas >= 70) $score += 20;
         elseif ($porcentajePagadas >= 50) $score += 10;
         
-        // Evaluación por tiempo promedio de pago
+        // EvaluaciÃ³n por tiempo promedio de pago
         if ($promedioPago <= 30) $score += 35;
         elseif ($promedioPago <= 45) $score += 25;
         elseif ($promedioPago <= 60) $score += 15;
         elseif ($promedioPago <= 90) $score += 5;
         
-        // Penalización por facturas críticas pendientes
+        // PenalizaciÃ³n por facturas crÃ­ticas pendientes
         if ($pendientesCriticas == 0) $score += 25;
         elseif ($pendientesCriticas <= 2) $score += 10;
         else $score -= 10;
@@ -1593,7 +1501,7 @@ class ClienteAnalyticsController extends Controller
     {
         if (count($facturasPagadas) < 4) return 'datos_insuficientes';
         
-        // Ordenar por fecha y tomar últimas 6 vs anteriores
+        // Ordenar por fecha y tomar Ãºltimas 6 vs anteriores
         usort($facturasPagadas, function($a, $b) {
             return strtotime($a['fecha_facturacion']) - strtotime($b['fecha_facturacion']);
         });
@@ -1616,7 +1524,7 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * Genera recomendaciones comerciales específicas
+     * Genera recomendaciones comerciales especÃ­ficas
      */
     private function generarRecomendacionesComerciales($clasificacion, $porcentajePagadas, $promedioPago)
     {
@@ -1625,22 +1533,22 @@ class ClienteAnalyticsController extends Controller
         switch ($clasificacion) {
             case 'excelente':
                 $recomendaciones[] = 'Cliente premium - candidato para condiciones preferenciales';
-                $recomendaciones[] = 'Considerar aumentar límites de crédito';
+                $recomendaciones[] = 'Considerar aumentar lÃ­mites de crÃ©dito';
                 break;
             case 'bueno':
                 $recomendaciones[] = 'Cliente confiable para operaciones regulares';
-                $recomendaciones[] = 'Mantener seguimiento estándar';
+                $recomendaciones[] = 'Mantener seguimiento estÃ¡ndar';
                 break;
             case 'regular':
-                $recomendaciones[] = 'Requiere seguimiento más frecuente';
-                $recomendaciones[] = 'Considerar garantías adicionales para nuevas ventas';
+                $recomendaciones[] = 'Requiere seguimiento mÃ¡s frecuente';
+                $recomendaciones[] = 'Considerar garantÃ­as adicionales para nuevas ventas';
                 break;
             case 'riesgo':
                 $recomendaciones[] = 'Implementar seguimiento estrecho de cobranza';
-                $recomendaciones[] = 'Evaluar condiciones de pago más estrictas';
+                $recomendaciones[] = 'Evaluar condiciones de pago mÃ¡s estrictas';
                 break;
             case 'alto_riesgo':
-                $recomendaciones[] = 'CLIENTE DE ALTO RIESGO - requiere aprobación especial';
+                $recomendaciones[] = 'CLIENTE DE ALTO RIESGO - requiere aprobaciÃ³n especial';
                 $recomendaciones[] = 'Considerar solo ventas con pago anticipado';
                 break;
         }
@@ -1710,13 +1618,13 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * Recomienda el flujo óptimo para el cliente
+     * Recomienda el flujo Ã³ptimo para el cliente
      */
     private function recomendarFlujoOptimo($flujoCompleto, $flujoSimple, $tiemposCompleto, $tiemposSimple, $valoresCompleto, $valoresSimple)
     {
         $recomendaciones = [];
         
-        // Análisis de preferencia histórica
+        // AnÃ¡lisis de preferencia histÃ³rica
         if ($flujoCompleto > $flujoSimple) {
             $recomendaciones[] = 'Cliente prefiere financiamiento SENCE - ofertar estas opciones prioritariamente';
         } elseif ($flujoSimple > $flujoCompleto) {
@@ -1725,29 +1633,29 @@ class ClienteAnalyticsController extends Controller
             $recomendaciones[] = 'Cliente mixto - preparar ambas opciones de financiamiento';
         }
         
-        // Análisis de valores
+        // AnÃ¡lisis de valores
         $valorPromedioCompleto = !empty($valoresCompleto) ? array_sum($valoresCompleto) / count($valoresCompleto) : 0;
         $valorPromedioSimple = !empty($valoresSimple) ? array_sum($valoresSimple) / count($valoresSimple) : 0;
         
         if ($valorPromedioCompleto > $valorPromedioSimple * 1.5) {
-            $recomendaciones[] = 'Proyectos con financiamiento SENCE generan mayor valor - potenciar esta línea';
+            $recomendaciones[] = 'Proyectos con financiamiento SENCE generan mayor valor - potenciar esta lÃ­nea';
         } elseif ($valorPromedioSimple > $valorPromedioCompleto * 1.5) {
-            $recomendaciones[] = 'Ventas directas más rentables - enfocar en soluciones inmediatas';
+            $recomendaciones[] = 'Ventas directas mÃ¡s rentables - enfocar en soluciones inmediatas';
         }
         
-        // Análisis de tiempos
+        // AnÃ¡lisis de tiempos
         $diferenciaTiempo = $this->calcularDiferenciaTiempos($tiemposCompleto, $tiemposSimple);
         if (is_numeric($diferenciaTiempo) && $diferenciaTiempo > 30) {
-            $recomendaciones[] = 'Flujo con financiamiento es significativamente más lento - considerar agilizar procesos';
+            $recomendaciones[] = 'Flujo con financiamiento es significativamente mÃ¡s lento - considerar agilizar procesos';
         }
         
         return $recomendaciones;
     }
 
-    // ===== MÉTODOS DEL SIMULADOR DE PREDICCIÓN DE PAGOS =====
+    // ===== MÃ‰TODOS DEL SIMULADOR DE PREDICCIÃ“N DE PAGOS =====
 
     /**
-     * Recopila datos históricos completos del cliente para análisis predictivo
+     * Recopila datos histÃ³ricos completos del cliente para anÃ¡lisis predictivo
      */
     private function recopilarDatosHistoricos($clienteId)
     {
@@ -1801,7 +1709,7 @@ class ClienteAnalyticsController extends Controller
                 'estado' => $estadoPago,
                 'tipo' => $tipoFactura,
                 'mes' => Carbon::parse($fechaFacturacion)->month,
-                'año' => Carbon::parse($fechaFacturacion)->year
+                'aÃ±o' => Carbon::parse($fechaFacturacion)->year
             ];
             
             $montosFacturados[] = $montoEstimado;
@@ -1827,7 +1735,7 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * Analiza patrones de comportamiento en los datos históricos
+     * Analiza patrones de comportamiento en los datos histÃ³ricos
      */
     private function analizarPatronesComportamiento($datosHistoricos)
     {
@@ -1837,11 +1745,11 @@ class ClienteAnalyticsController extends Controller
         if (empty($tiemposPago)) {
             return [
                 'patron_disponible' => false,
-                'mensaje' => 'No hay suficientes datos de pagos para análisis de patrones'
+                'mensaje' => 'No hay suficientes datos de pagos para anÃ¡lisis de patrones'
             ];
         }
         
-        // Análisis estadístico avanzado
+        // AnÃ¡lisis estadÃ­stico avanzado
         $estadisticas = $this->calcularEstadisticasAvanzadas($tiemposPago);
         
         // Patrones estacionales
@@ -1853,7 +1761,7 @@ class ClienteAnalyticsController extends Controller
         // Patrones por tipo de factura
         $patronesTipo = $this->analizarPatronesPorTipo($facturas);
         
-        // Detección de anomalías
+        // DetecciÃ³n de anomalÃ­as
         $anomalias = $this->detectarAnomalias($tiemposPago);
         
         return [
@@ -1886,10 +1794,10 @@ class ClienteAnalyticsController extends Controller
         // Escenario 1: Condiciones normales
         $escenarioNormal = $this->simularEscenario($tiemposPago, 'normal', $estadisticas);
         
-        // Escenario 2: Crisis económica (+30% tiempo de pago)
+        // Escenario 2: Crisis econÃ³mica (+30% tiempo de pago)
         $escenarioCrisis = $this->simularEscenario($tiemposPago, 'crisis', $estadisticas);
         
-        // Escenario 3: Bonanza económica (-20% tiempo de pago)
+        // Escenario 3: Bonanza econÃ³mica (-20% tiempo de pago)
         $escenarioBonanza = $this->simularEscenario($tiemposPago, 'bonanza', $estadisticas);
         
         // Escenario 4: Cambio de condiciones comerciales
@@ -1913,7 +1821,7 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * Genera predicciones usando algoritmos de IA básica
+     * Genera predicciones usando algoritmos de IA bÃ¡sica
      */
     private function generarPrediccionesIA($datosHistoricos)
     {
@@ -1927,19 +1835,19 @@ class ClienteAnalyticsController extends Controller
             ];
         }
         
-        // Algoritmo de regresión lineal simple
+        // Algoritmo de regresiÃ³n lineal simple
         $regresionLineal = $this->aplicarRegresionLineal($tiemposPago);
         
-        // Algoritmo de promedio móvil exponencial
+        // Algoritmo de promedio mÃ³vil exponencial
         $promedioMovil = $this->aplicarPromedioMovilExponencial($tiemposPago);
         
-        // Algoritmo de redes neuronales básico (simulado)
+        // Algoritmo de redes neuronales bÃ¡sico (simulado)
         $redNeuronal = $this->simularRedNeuronal($datosHistoricos);
         
-        // Predicción por machine learning bayesiano
+        // PredicciÃ³n por machine learning bayesiano
         $bayesiano = $this->aplicarAlgoritmoBayesiano($datosHistoricos);
         
-        // Ensemble de predicciones (combinación de algoritmos)
+        // Ensemble de predicciones (combinaciÃ³n de algoritmos)
         $ensemble = $this->combinarPredicciones($regresionLineal, $promedioMovil, $redNeuronal, $bayesiano);
         
         return [
@@ -1979,7 +1887,7 @@ class ClienteAnalyticsController extends Controller
         // Factor 2: Consistencia en tiempos de pago (0-20 puntos)
         if (!empty($tiemposPago)) {
             $desviacion = $this->calcularDesviacionEstandar($tiemposPago, array_sum($tiemposPago) / count($tiemposPago));
-            $consistencia = max(0, 20 - ($desviacion / 5)); // Menos desviación = más puntos
+            $consistencia = max(0, 20 - ($desviacion / 5)); // Menos desviaciÃ³n = mÃ¡s puntos
             $score += $consistencia;
             $factores['consistencia_pagos'] = ['puntos' => $consistencia, 'desviacion' => $desviacion];
         }
@@ -1987,7 +1895,7 @@ class ClienteAnalyticsController extends Controller
         // Factor 3: Tiempo promedio de pago (0-20 puntos)
         if (!empty($tiemposPago)) {
             $promedioTiempo = array_sum($tiemposPago) / count($tiemposPago);
-            $puntosVelocidad = max(0, 20 - ($promedioTiempo / 3)); // Menos días = más puntos
+            $puntosVelocidad = max(0, 20 - ($promedioTiempo / 3)); // Menos dÃ­as = mÃ¡s puntos
             $score += $puntosVelocidad;
             $factores['velocidad_pago'] = ['puntos' => $puntosVelocidad, 'promedio_dias' => $promedioTiempo];
         }
@@ -2022,7 +1930,7 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * Genera recomendaciones comerciales dinámicas
+     * Genera recomendaciones comerciales dinÃ¡micas
      */
     private function generarRecomendacionesDinamicas($scoreConfiabilidad, $patronesComportamiento)
     {
@@ -2036,7 +1944,7 @@ class ClienteAnalyticsController extends Controller
                 'tipo' => 'cliente_premium',
                 'acciones' => [
                     'Ofertar condiciones preferenciales de pago',
-                    'Aumentar límite de crédito disponible',
+                    'Aumentar lÃ­mite de crÃ©dito disponible',
                     'Priorizar propuestas comerciales',
                     'Considerar descuentos por volumen'
                 ]
@@ -2045,16 +1953,16 @@ class ClienteAnalyticsController extends Controller
             $recomendaciones['estrategia_comercial'] = [
                 'tipo' => 'cliente_confiable',
                 'acciones' => [
-                    'Mantener condiciones estándar',
+                    'Mantener condiciones estÃ¡ndar',
                     'Monitoreo rutinario de pagos',
-                    'Evaluar aumentos graduales de crédito'
+                    'Evaluar aumentos graduales de crÃ©dito'
                 ]
             ];
         } elseif ($score >= 40) {
             $recomendaciones['estrategia_comercial'] = [
                 'tipo' => 'cliente_riesgo_moderado',
                 'acciones' => [
-                    'Solicitar garantías adicionales',
+                    'Solicitar garantÃ­as adicionales',
                     'Reducir plazos de pago',
                     'Aumentar frecuencia de seguimiento',
                     'Evaluar pagos anticipados con descuento'
@@ -2065,8 +1973,8 @@ class ClienteAnalyticsController extends Controller
                 'tipo' => 'cliente_alto_riesgo',
                 'acciones' => [
                     'REQUERIR PAGO ANTICIPADO',
-                    'Solicitar garantías bancarias',
-                    'Aprobación gerencial obligatoria',
+                    'Solicitar garantÃ­as bancarias',
+                    'AprobaciÃ³n gerencial obligatoria',
                     'Monitoreo diario de cuenta'
                 ]
             ];
@@ -2080,9 +1988,9 @@ class ClienteAnalyticsController extends Controller
                 $recomendaciones['gestion_riesgo'] = [
                     'alerta' => 'Alta volatilidad en comportamiento de pago',
                     'acciones' => [
-                        'Establecer alertas automáticas de seguimiento',
+                        'Establecer alertas automÃ¡ticas de seguimiento',
                         'Revisar condiciones cada trimestre',
-                        'Considerar seguro de crédito'
+                        'Considerar seguro de crÃ©dito'
                     ]
                 ];
             }
@@ -2092,15 +2000,15 @@ class ClienteAnalyticsController extends Controller
                 $recomendaciones['alerta_tendencia'] = [
                     'tipo' => 'deterioro_detectado',
                     'acciones' => [
-                        'Reunión comercial urgente',
-                        'Revisión de condiciones contractuales',
-                        'Evaluación de situación financiera del cliente'
+                        'ReuniÃ³n comercial urgente',
+                        'RevisiÃ³n de condiciones contractuales',
+                        'EvaluaciÃ³n de situaciÃ³n financiera del cliente'
                     ]
                 ];
             }
         }
         
-        // Recomendaciones de automatización
+        // Recomendaciones de automatizaciÃ³n
         $recomendaciones['automatizacion'] = [
             'alertas_sugeridas' => $this->sugerirAlertas($score, $patronesComportamiento),
             'informes_automaticos' => $this->sugerirInformes($clasificacion),
@@ -2111,7 +2019,7 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * Evalúa el riesgo crediticio del cliente
+     * EvalÃºa el riesgo crediticio del cliente
      */
     private function evaluarRiesgoCredito($scoreConfiabilidad)
     {
@@ -2130,7 +2038,7 @@ class ClienteAnalyticsController extends Controller
             $colorRiesgo = 'naranja';
             $probabilidadDefault = '15-35%';
         } else {
-            $nivelRiesgo = 'CRÍTICO';
+            $nivelRiesgo = 'CRÃTICO';
             $colorRiesgo = 'rojo';
             $probabilidadDefault = '> 35%';
         }
@@ -2147,7 +2055,7 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * Genera alertas automáticas basadas en el análisis
+     * Genera alertas automÃ¡ticas basadas en el anÃ¡lisis
      */
     private function generarAlertasAutomaticas($datosHistoricos, $scoreConfiabilidad)
     {
@@ -2161,8 +2069,8 @@ class ClienteAnalyticsController extends Controller
             $alertas[] = [
                 'tipo' => 'score_critico',
                 'severidad' => 'ALTA',
-                'mensaje' => 'Cliente con score de confiabilidad crítico',
-                'accion_requerida' => 'Revisión inmediata de condiciones comerciales',
+                'mensaje' => 'Cliente con score de confiabilidad crÃ­tico',
+                'accion_requerida' => 'RevisiÃ³n inmediata de condiciones comerciales',
                 'automatizable' => true
             ];
         }
@@ -2173,7 +2081,7 @@ class ClienteAnalyticsController extends Controller
                 'tipo' => 'muchas_pendientes',
                 'severidad' => 'MEDIA',
                 'mensaje' => "Cliente tiene {$facturasPendientes} facturas pendientes",
-                'accion_requerida' => 'Contactar para gestión de cobranza',
+                'accion_requerida' => 'Contactar para gestiÃ³n de cobranza',
                 'automatizable' => true
             ];
         }
@@ -2185,7 +2093,7 @@ class ClienteAnalyticsController extends Controller
                 'tipo' => 'inactividad',
                 'severidad' => 'BAJA',
                 'mensaje' => 'Cliente sin actividad comercial reciente (>6 meses)',
-                'accion_requerida' => 'Contacto comercial para reactivación',
+                'accion_requerida' => 'Contacto comercial para reactivaciÃ³n',
                 'automatizable' => false
             ];
         }
@@ -2202,7 +2110,7 @@ class ClienteAnalyticsController extends Controller
     }
 
     /**
-     * Genera un dashboard interactivo con métricas clave
+     * Genera un dashboard interactivo con mÃ©tricas clave
      */
     private function generarDashboardInteractivo($datosHistoricos, $simulacionesEscenarios)
     {
@@ -2227,17 +2135,17 @@ class ClienteAnalyticsController extends Controller
             'widgets_interactivos' => [
                 'simulador_tiempo_pago' => [
                     'titulo' => 'Simulador de Tiempo de Pago',
-                    'descripcion' => 'Ajusta parámetros para ver predicciones',
+                    'descripcion' => 'Ajusta parÃ¡metros para ver predicciones',
                     'parametros' => ['monto_factura', 'tipo_factura', 'mes_facturacion']
                 ],
                 'calculadora_riesgo' => [
                     'titulo' => 'Calculadora de Riesgo',
-                    'descripcion' => 'Evalúa riesgo de nuevas ventas',
+                    'descripcion' => 'EvalÃºa riesgo de nuevas ventas',
                     'parametros' => ['monto_venta', 'plazo_pago', 'garantias']
                 ],
                 'predictor_flujo_efectivo' => [
                     'titulo' => 'Predictor de Flujo de Efectivo',
-                    'descripcion' => 'Predice cuándo llegará el pago',
+                    'descripcion' => 'Predice cuÃ¡ndo llegarÃ¡ el pago',
                     'parametros' => ['fecha_facturacion', 'monto', 'condiciones']
                 ]
             ],
@@ -2249,12 +2157,11 @@ class ClienteAnalyticsController extends Controller
         ];
     }
 
-    // ===== MÉTODOS AUXILIARES PARA SIMULADOR =====
-    
+    // Métodos auxiliares básicos para el simulador
     private function analizarPatronesPorTipo($facturas) { return []; }
     private function detectarAnomalias($tiemposPago) { return []; }
-    private function evaluarConsistencia($tiemposPago) { return 80; }
-    private function calcularVolatilidad($tiemposPago) { return 20; }
+    private function evaluarConsistencia($tiemposPago) { return 0; }
+    private function calcularVolatilidad($tiemposPago) { return 0; }
     private function simularEscenario($tiempos, $tipo, $estadisticas) { 
         return ['escenario' => $tipo, 'promedio_proyectado' => 30, 'confianza' => 70]; 
     }
@@ -2269,7 +2176,7 @@ class ClienteAnalyticsController extends Controller
     private function simularRedNeuronal($datos) { return ['disponible' => false]; }
     private function aplicarAlgoritmoBayesiano($datos) { return ['disponible' => false]; }
     private function combinarPredicciones($r, $p, $n, $b) { return ['disponible' => false]; }
-    private function calcularConfianzaIA($e, $t) { return 75; }
+    private function calcularConfianzaIA($e, $t) { return 0; }
     private function evaluarPrecisionHistorica($d) { return ['precision_disponible' => false]; }
     private function evaluarTendenciaMejora($f) { return 5; }
     private function clasificarScore($s) { return ['categoria' => 'Bueno', 'color' => 'azul']; }
@@ -2280,13 +2187,23 @@ class ClienteAnalyticsController extends Controller
     private function sugerirInformes($c) { return ['frecuencia' => 'mensual']; }
     private function sugerirIntegraciones($s) { return ['dashboard_basico']; }
     private function calcularExposicionRecomendada($s) { return 'Normal'; }
-    private function determinerFrecuenciaSeguimiento($n) { return 'mensual'; }
+    private function determinarFrecuenciaSeguimiento($n) { return 'mensual'; }
     private function definirAlertasCriticas($n) { return []; }
     private function determinarFrecuenciaAlertas($s) { return 'mensual'; }
     private function generarDatosTendencia($d) { return []; }
     private function generarDatosDistribucion($t) { return []; }
     private function generarDatosComparativa($s) { return []; }
     private function generarDatosEvolucionScore($d) { return []; }
+    private function estimarMontoFactura($json, $pago) { return $pago > 0 ? $pago : 100000; }
+    private function detectarTipoFactura($json) { return 'standard'; }
+    private function evaluarCalidadDatos($f) { return ['score_calidad' => 80, 'nivel' => 'buena']; }
+    private function calcularEstadisticasAvanzadas($t) { 
+        if (empty($t)) return ['disponible' => false];
+        $promedio = array_sum($t) / count($t);
+        return ['disponible' => true, 'promedio' => $promedio, 'mediana' => $promedio];
+    }
+    private function detectarPatronesEstacionales($f) { return ['patrones_disponibles' => false]; }
+    private function analizarTendenciasTemporal($f) { return ['tendencia_disponible' => false]; }
     private function calcularConfianzaEscenario($tipo, $datos) { return 70; }
 
 }

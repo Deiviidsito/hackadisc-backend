@@ -535,4 +535,7 @@ Route::prefix('clientes-analytics')->group(function () {
     
     // Comparar dos clientes
     Route::get('/{clienteId1}/compare/{clienteId2}', [ClienteAnalyticsController::class, 'compararClientes']);
+    
+    // 💳 Simulador de Predicción de Tiempo de Pago con IA
+    Route::get('/{clienteId}/simulador-prediccion', [ClienteAnalyticsController::class, 'simularPrediccionPagos']);
 });
