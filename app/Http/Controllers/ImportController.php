@@ -1079,24 +1079,15 @@ class ImportController extends Controller
             }
         }
         
-        // === PASO 3: CREAR VENTAS CON LOS IDs CORRECTOS ===
+        // === PASO 3: CREAR VENTAS CON InsecapClienteId DIRECTAMENTE ===
         foreach ($mapaClientes as $idComercializacion => $info) {
             $ventaData = $info['ventaData'];
             $insecapClienteId = $info['insecapClienteId'];
             
-            // Obtener el ID real del cliente
-            $clienteIdReal = null;
-            if (isset($clientesCreados[$insecapClienteId])) {
-                $clienteIdReal = $clientesCreados[$insecapClienteId];
-            } elseif (isset($datosExistentes['clientes'][$insecapClienteId])) {
-                $clienteIdReal = $datosExistentes['clientes'][$insecapClienteId]['id'];
-            }
-            
-            if ($clienteIdReal) {
-                $this->procesarVentaConClienteId($ventaData, $clienteIdReal, $datosExistentes, $ventasParaCrear);
-                $this->procesarEstadosVenta($ventaData, $estadosVentaParaCrear);
-                $this->procesarFacturasYEstados($ventaData, $facturasParaCrear, $estadosFacturaParaCrear, $datosExistentes);
-            }
+            // Usar InsecapClienteId directamente en lugar del ID nativo de Laravel
+            $this->procesarVentaConInsecapClienteId($ventaData, $insecapClienteId, $datosExistentes, $ventasParaCrear);
+            $this->procesarEstadosVenta($ventaData, $estadosVentaParaCrear);
+            $this->procesarFacturasYEstados($ventaData, $facturasParaCrear, $estadosFacturaParaCrear, $datosExistentes);
         }
         
         // === PASOS 4-5: CREAR VENTAS Y OBTENER SUS IDs REALES ===
@@ -1176,13 +1167,13 @@ class ImportController extends Controller
     }
 
     /**
-     * PROCESAMIENTO OPTIMIZADO DE VENTA CON ID REAL DE CLIENTE
+     * PROCESAMIENTO OPTIMIZADO DE VENTA CON InsecapClienteId DIRECTAMENTE
      */
-    private function procesarVentaConClienteId($ventaData, $clienteIdReal, &$datosExistentes, &$ventasParaCrear)
+    private function procesarVentaConInsecapClienteId($ventaData, $insecapClienteId, &$datosExistentes, &$ventasParaCrear)
     {
         $idComercializacion = $ventaData['idComercializacion'] ?? null;
         
-        if (!$idComercializacion) {
+        if (!$idComercializacion || !$insecapClienteId) {
             return false;
         }
         
@@ -1198,7 +1189,7 @@ class ImportController extends Controller
             'idComercializacion' => $idComercializacion,
             'CodigoCotizacion' => $ventaData['CodigoCotizacion'] ?? '',
             'FechaInicio' => $this->convertirFecha($ventaData['FechaInicio'] ?? null),
-            'ClienteId' => $clienteIdReal, // Usar el ID real de la tabla clientes
+            'ClienteId' => $insecapClienteId, // Usar InsecapClienteId directamente
             'NombreCliente' => $ventaData['NombreCliente'] ?? '',
             'CorreoCreador' => $ventaData['CorreoCreador'] ?? '',
             'ValorFinalComercializacion' => $ventaData['ValorFinalComercializacion'] ?? 0,

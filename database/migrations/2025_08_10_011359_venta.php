@@ -16,7 +16,7 @@ return new class extends Migration
         $table->unsignedBigInteger('idComercializacion')->unique(); // ID del JSON, único pero no autoincremental
         $table->string('CodigoCotizacion');
         $table->date('FechaInicio');
-        $table->unsignedBigInteger('ClienteId');
+        $table->unsignedBigInteger('ClienteId'); // Cambiado para almacenar InsecapClienteId directamente
         $table->string('NombreCliente');
         $table->string('CorreoCreador');
         $table->decimal('ValorFinalComercializacion', 15, 2);
@@ -26,9 +26,9 @@ return new class extends Migration
         $table->timestamps();
 
         // Relaciones correctas
-        // Elimina la FK de CodigoCotizacion a facturas.numero
+        // ClienteId ahora almacena InsecapClienteId directamente (sin FK)
         $table->foreign('ClienteId')
-              ->references('id')->on('clientes')
+              ->references('InsecapClienteId')->on('clientes')
               ->cascadeOnUpdate()->cascadeOnDelete();
         $table->foreign('CorreoCreador')
               ->references('email')->on('users')
