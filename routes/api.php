@@ -5,6 +5,8 @@ use App\Http\Controllers\ImportController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\VentasTotalesController;
+use App\Http\Controllers\TiempoEtapasController;
+use App\Http\Controllers\DebugController;
 
 // ==================== RUTAS DE AUTENTICACIÓN ====================
 Route::post('login', [AuthController::class, 'login']);
@@ -74,3 +76,46 @@ Route::post('ventas/calcular-por-mes', [VentasTotalesController::class, 'calcula
 // - Estadísticas de actividad mensual
 // - Promedios y métricas de rendimiento
 Route::get('ventas/resumen-anual', [VentasTotalesController::class, 'resumenVentasPorAño']);
+
+// ==================== RUTAS DE ANÁLISIS TIEMPO ENTRE ETAPAS ====================
+
+// POST /api/tiempo-etapas/promedio - ANÁLISIS TIEMPO PROMEDIO ENTRE ETAPAS
+// ⏱️ FUNCIONALIDADES:
+// - Calcula tiempo desde estado 0 (En proceso) hasta estado 1 (Terminada)
+// - Maneja casos complejos con múltiples transiciones de estado
+// - Toma la última fecha del estado 1 como referencia final
+// - Filtros por año, mes, y exclusión de prefijos (ADI, OTR, SPD)
+// - Estadísticas: promedio, mediana, min, max
+// - Opción de incluir detalles individuales por venta
+// Body: {"año": 2024, "mes_inicio": 1, "mes_fin": 12, "incluir_detalles": false}
+Route::post('tiempo-etapas/promedio', [TiempoEtapasController::class, 'calcularTiempoPromedioEtapas']);
+
+// POST /api/tiempo-etapas/por-cliente - ANÁLISIS TIEMPOS AGRUPADO POR CLIENTE
+// 👥 CARACTERÍSTICAS:
+// - Tiempo promedio de procesamiento por cliente
+// - Estadísticas individuales: min, max, total ventas
+// - Ordenado por tiempo promedio descendente
+// - Identifica clientes con procesos más lentos/rápidos
+// Body: {"año": 2024, "mes_inicio": 1, "mes_fin": 12}
+Route::post('tiempo-etapas/por-cliente', [TiempoEtapasController::class, 'analizarTiemposPorCliente']);
+
+// POST /api/tiempo-etapas/distribucion - DISTRIBUCIÓN DE TIEMPOS EN RANGOS
+// 📊 CARACTERÍSTICAS:
+// - Agrupa tiempos en rangos predefinidos (0-7, 8-15, 16-30, etc.)
+// - Porcentajes de distribución
+// - Identificación de patrones de tiempo
+// - Útil para análisis de eficiencia operacional
+// Body: {"año": 2024, "mes_inicio": 1, "mes_fin": 12}
+Route::post('tiempo-etapas/distribucion', [TiempoEtapasController::class, 'obtenerDistribucionTiempos']);
+
+// GET /api/tiempo-etapas/verificar-bd - VERIFICACIÓN DE BASE DE DATOS (TESTING)
+// 🔍 CARACTERÍSTICAS:
+// - Verifica estructura y contenido de las tablas
+// - Muestra estadísticas básicas y ejemplos de datos
+// - Útil para debugging y validación
+Route::get('tiempo-etapas/verificar-bd', [TiempoEtapasController::class, 'verificarBaseDatos']);
+
+// ==================== RUTAS DE DEBUG ====================
+Route::get('debug/test-basico', [DebugController::class, 'testBasico']);
+Route::get('debug/test-tablas', [DebugController::class, 'testTablas']);
+Route::get('debug/test-join', [DebugController::class, 'testJoin']);
